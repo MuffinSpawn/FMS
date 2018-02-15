@@ -4,7 +4,10 @@ Created on Thu Feb  1 16:05:49 2018
 
 @author: peter
 """
+
+import csv
 import logging
+import math
 import numpy
 import numpy.linalg as linalg
 import os
@@ -100,8 +103,31 @@ def measure(command, setiof=False):
 
         return command.StartMeasurement()
 
+def loadDSCS(filename):
+    with open(filename, 'r') as file:
+        string_data = list(csv.reader(file, delimiter=','))
+
+    reflector_names = []
+    cylindrical_reflector_coordinates = numpy.ndarray((len(string_data), 3))
+    for index,row in enumerate(string_data):
+        reflector_names.append(row[0])
+        point = list(map(lambda x: float(x), row[1:]))
+        cylindrical_reflector_coordinates[index,:] = point
+
+    cartesian_reflector_coordinates = numpy.ndarray((5, 3))
+    for index,point in enumerate(cylindrical_reflector_coordinates):
+        cartesian_reflector_coordinates[index,0] = point[0] * math.cos(point[1])
+        cartesian_reflector_coordinates[index,1] = point[0] * math.sin(point[1])
+        cartesian_reflector_coordinates[index,2] = point[2]
+    return (reflector_names, cartesian_reflector_coordinates)
+
 def main():
     signal.signal(signal.SIGINT, signal_handler)
+
+    # FIXME: get the DSCS data file from the command line
+    filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
+    reflector_names, cartesian_DSCS = loadDSCS(filename)
+
     connection = LTConnection()
     try:
         logger.info('Connecting to the laser tracker...')
@@ -114,20 +140,29 @@ def main():
         initialize(command, manualiof=False)
         
         measurements = []
+        target_reflector_names = []
         
         ordinal_strings = ['first', 'second', 'third']
         for index in range(3):
+            target_reflector_name = input(\
+                "Enter the name of the {} reference reflector.".format(ordinal_strings[index]))
+            if not target_reflector_name in reflector_names:
+                raise Exception('Reflector name does not match any of the configured DSCS reflector names.')
+            target_reflector_names.append(target_reflector_name)
+            
             print("Acquire the {} reference reflector.".format(ordinal_strings[index]))
             press_any_key_to_continue()
             logger.info('Measuring reflector..')
             measurements.append(measure(command, setiof=False))
 
-        init_coordinates_LTCS = numpy.ndarray((3, 3))
+        initial_coordinates_LTCS = numpy.ndarray((3, 3))
         for index,measurement in enumerate(measurements):
-            init_coordinates_LTCS[index,0] = measurement.dVal1
-            init_coordinates_LTCS[index,1] = measurement.dVal2
-            init_coordinates_LTCS[index,2] = measurement.dVal3
-        print('Initial LTCS Coordinates:\n{}'.format(init_coordinates_LTCS))
+            initial_coordinates_LTCS[index,0] = measurement.dVal1
+            initial_coordinates_LTCS[index,1] = measurement.dVal2
+            initial_coordinates_LTCS[index,2] = measurement.dVal3
+        print('Initial LTCS Coordinates:\n{}'.format(initial_coordinates_LTCS.transpose()))
+
+
     finally:
         connection.disconnect()
 
