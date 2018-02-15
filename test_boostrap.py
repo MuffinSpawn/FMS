@@ -8,9 +8,10 @@ import csv
 import math
 import numpy
 import numpy.linalg as linalg
+import matplotlib.pyplot as plt
 
 # Measured Spherical LTCS Coordinates
-filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\reference_network_LTCS.csv'
+filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network_LTCS.csv'
 with open(filename, 'r') as file:
     string_data = list(csv.reader(file, delimiter=','))
 
@@ -34,19 +35,19 @@ H = numpy.hstack([P[0,2], P[2,2], P[3,2]])-P[0,2]
 print('H: {}'.format(H))
 
 # Configured Cylindrical DSCS Coordinates
-filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\reference_network.csv'
+filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
 with open(filename, 'r') as file:
     string_data = list(csv.reader(file, delimiter=','))
 
-data = numpy.ndarray((len(string_data), 3))
+datap = numpy.ndarray((len(string_data), 3))
 for index,row in enumerate(string_data):
     point = list(map(lambda x: float(x), row[1:]))
-    data[index,:] = point
-print('Configured Cylindrical DSCS Coordinates:\n{}'.format(data))
+    datap[index,:] = point
+print('Configured Cylindrical DSCS Coordinates:\n{}'.format(datap))
 
 # Configured Cartesian DSCS Coordinates
 Pp = numpy.ndarray((5, 3))
-for index,point in enumerate(data):
+for index,point in enumerate(datap):
     Pp[index,0] = point[0] * math.cos(point[1])
     Pp[index,1] = point[0] * math.sin(point[1])
     Pp[index,2] = point[2]
@@ -73,10 +74,30 @@ Y_all_2D = numpy.dot(T, X_all[(True, True, False, True),:])
 Y_all = numpy.vstack([Y_all_2D[1], Y_all_2D[2], Hp_all+dH])
 print('All Configured LTCS Coordinates:\n{}'.format(Y_all))
 
-''' 3D LLS doesn't work with only 3 points
-Y = numpy.vstack([[1, 1, 1], numpy.vstack([P[0], P[2], P[4]]).transpose()])
-X = numpy.vstack([[1, 1, 1], numpy.vstack([Pp[0], Pp[2], Pp[4]]).transpose()])
+T_inv = linalg.inv(T)
+S = numpy.array([1, 0, 0])
+Sp_2D = numpy.dot(T_inv, S)
+Sp = numpy.array([Sp_2D[1], -dH, Sp_2D[2]])
+print('Tracker Cartesian DSCS Coordinates: {}'.format(Sp))
+
+Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([P[0], P[2], P[4], [0, 0, 0]]).transpose()])
+X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Pp[0], Pp[2], Pp[4], Sp]).transpose()])
 T = numpy.dot(Y, linalg.pinv(X))
 Y_all = numpy.dot(T, X_all)
 print('All Configured LTCS Coordinates (3D LLS):\n{}'.format(Y_all))
+
+
+
+
+'''
+plt.plot(P[:,2]-P[0,2])
+plt.plot(Pp[:,1]-Pp[0,1])
+plt.plot(Pp[:,1]-Pp[0,1]+dH)
+'''
+'''
+heights = P[:,2]-numpy.mean(P[:,2])
+heightsp = Pp[:,1]-numpy.mean(Pp[:,1])
+height_residuals = heights-heightsp
+distances = data[:,2]
+plt.scatter(distances, height_residuals)
 '''
