@@ -121,6 +121,42 @@ def loadDSCS(filename):
         cartesian_reflector_coordinates[index,2] = point[2]
     return (reflector_names, cartesian_reflector_coordinates)
 
+def measure_initial_reflectors(command, reflector_names):
+        
+    measure_initial_reflectors(command)
+    measurements = []
+    target_reflector_names = []
+    
+    ordinal_strings = ['first', 'second', 'third']
+    for index in range(3):
+        target_reflector_name = input(\
+            "Enter the name of the {} reference reflector.".format(ordinal_strings[index]))
+        if not target_reflector_name in reflector_names:
+            raise Exception('Reflector name does not match any of the configured DSCS reflector names.')
+        target_reflector_names.append(target_reflector_name)
+        
+        print("Acquire the {} reference reflector.".format(ordinal_strings[index]))
+        press_any_key_to_continue()
+        logger.info('Measuring reflector..')
+        measurements.append(measure(command, setiof=False))
+
+    initial_coordinates_LTCS = numpy.ndarray((3, 3))
+    for index,measurement in enumerate(measurements):
+        initial_coordinates_LTCS[index,0] = measurement.dVal1
+        initial_coordinates_LTCS[index,1] = measurement.dVal2
+        initial_coordinates_LTCS[index,2] = measurement.dVal3
+    return (target_reflector_names, initial_coordinates_LTCS)
+
+def calculate_transform(reflector_names,        cartesian_DSCS,\
+                        target_reflector_names, initial_coordinates_LTCS):
+    return numpy.zeros((4, 4))
+
+def calculate_approx_LTCS(cartesian_DSCS):
+    return numpy.zeros((5, 3))
+
+def print_configuration():
+    print('Not Implemented!')
+
 def main():
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -138,30 +174,16 @@ def main():
         press_any_key_to_continue()
         logger.info('Initializing laser tracker...')
         initialize(command, manualiof=False)
-        
-        measurements = []
-        target_reflector_names = []
-        
-        ordinal_strings = ['first', 'second', 'third']
-        for index in range(3):
-            target_reflector_name = input(\
-                "Enter the name of the {} reference reflector.".format(ordinal_strings[index]))
-            if not target_reflector_name in reflector_names:
-                raise Exception('Reflector name does not match any of the configured DSCS reflector names.')
-            target_reflector_names.append(target_reflector_name)
-            
-            print("Acquire the {} reference reflector.".format(ordinal_strings[index]))
-            press_any_key_to_continue()
-            logger.info('Measuring reflector..')
-            measurements.append(measure(command, setiof=False))
 
-        initial_coordinates_LTCS = numpy.ndarray((3, 3))
-        for index,measurement in enumerate(measurements):
-            initial_coordinates_LTCS[index,0] = measurement.dVal1
-            initial_coordinates_LTCS[index,1] = measurement.dVal2
-            initial_coordinates_LTCS[index,2] = measurement.dVal3
+        target_reflector_names, initial_coordinates_LTCS = measure_initial_reflectors(command, reflector_names)
         print('Initial LTCS Coordinates:\n{}'.format(initial_coordinates_LTCS.transpose()))
 
+        transform_matrix = calculate_transform(reflector_names,        cartesian_DSCS,\
+                                               target_reflector_names, initial_coordinates_LTCS)
+
+        cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS)
+
+        print_configuration()
 
     finally:
         connection.disconnect()
