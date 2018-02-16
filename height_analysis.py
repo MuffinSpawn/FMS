@@ -2,7 +2,7 @@
 """
 Created on Tue Feb 13 10:46:59 2018
 
-@author: fms-local
+@author: Peter G. Lane (petergwinlane@gmail.com)
 """
 import csv
 import math

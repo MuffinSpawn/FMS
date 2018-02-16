@@ -2,7 +2,7 @@
 """
 Created on Thu Feb  1 16:05:49 2018
 
-@author: peter
+@author: Peter G. Lane (petergwinlane@gmail.com)
 """
 
 import csv
