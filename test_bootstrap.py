@@ -30,7 +30,7 @@ for index,point in enumerate(data):
 print('Measured Cartesian LTCS Coordinates:\n{}'.format(P.transpose()))
 
 Y = numpy.vstack([[1, 1, 1], numpy.vstack([P[0,:2], P[2,:2], P[4,:2]]).transpose()])
-print('Y (Measured 2D Cartesian LTCS Coordinates):\n{}'.format(X))
+print('Y (Measured 2D Cartesian LTCS Coordinates):\n{}'.format(Y))
 H = numpy.hstack([P[0,2], P[2,2], P[3,2]])-P[0,2]
 print('H: {}'.format(H))
 
@@ -54,6 +54,7 @@ for index,point in enumerate(datap):
 X_all = numpy.vstack([[1, 1, 1, 1, 1], Pp.transpose()])
 print('Configured Cartesian DSCS Coordinates:\n{}'.format(X_all))
 
+'''
 mask = [True, False, True]
 X = numpy.vstack([[1, 1, 1], numpy.vstack([Pp[0,mask], Pp[2,mask], Pp[4,mask]]).transpose()])
 print('X (Configured 2D Cartesian LTCS Coordinates):\n{}'.format(Y))
@@ -85,8 +86,43 @@ X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Pp[0], Pp[2], Pp[4], Sp]).transpos
 T = numpy.dot(Y, linalg.pinv(X))
 Y_all = numpy.dot(T, X_all)
 print('All Configured LTCS Coordinates (3D LLS):\n{}'.format(Y_all))
+'''
 
+A = P[0]
+O = numpy.array([0, 0, 0])
+AB = P[2]-P[0]
+AC = P[4]-P[0]
+AO = -P[0]
+z = numpy.cross(AB, AC)
+z_hat = z / linalg.norm(z)
+a = numpy.dot(z_hat, AO)
+b = numpy.dot(AB, AO)
+c = numpy.dot(AC, AO)
 
+Ap = Pp[0]
+ABp = Pp[2]-Pp[0]
+ACp = Pp[4]-Pp[0]
+zp = numpy.cross(ABp, ACp)
+zp_hat = zp / linalg.norm(zp)
+M = numpy.vstack([zp_hat, ABp, ACp])
+M_inv = linalg.inv(M)
+AOp = numpy.dot(M_inv, numpy.array([a, b, c]))
+Op = AOp + Ap
+
+Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([P[0], P[2], P[4], O]).transpose()])
+X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Pp[0], Pp[2], Pp[4], Op]).transpose()])
+T = numpy.dot(Y, linalg.pinv(X))
+Y_all = numpy.dot(T, X_all)
+
+print('z_hat: {}'.format(z_hat))
+print('zp_hat: {}'.format(zp_hat))
+print('AB: {}'.format(AB))
+print("AB': {}".format(ABp))
+print('AC: {}'.format(AC))
+print("AC': {}".format(ACp))
+print("O': {}".format(Op))
+print('All Measured Cartesian LTCS Coordinates:\n{}'.format(P.transpose()))
+print('All Configured LTCS Coordinates (3D LLS):\n{}'.format(Y_all))
 
 
 '''

@@ -154,6 +154,9 @@ def calculate_transform(reflector_names,        cartesian_DSCS,\
 def calculate_approx_LTCS(cartesian_DSCS):
     return numpy.zeros((5, 3))
 
+def scan_reference_network(cartesian_LTCS):
+    return numpy.zeros((5, 3))
+
 def print_configuration():
     print('Not Implemented!')
 
@@ -183,7 +186,9 @@ def main():
 
         cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS)
 
-        print_configuration()
+        spherical_LTCS = scan_reference_network(cartesian_LTCS)
+
+        print_configuration(spherical_LTCS)
 
     finally:
         connection.disconnect()
