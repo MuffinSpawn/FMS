@@ -22,7 +22,7 @@ from CESAPI.packet import *
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 def signal_handler(signal, frame):
         print('You pressed Ctrl+C!')
@@ -59,8 +59,8 @@ def initialize(command, forceinit=False, manualiof=False):
     mode_params.lMeasTime = 1000  # 1 second
     command.SetStationaryModeParams(mode_params)
 
-    logger.debug('setting coordinate system type...')
-    command.SetCoordinateSystemType(ES_CS_SCC)  # one of ES_CoordinateSystemType
+    logger.debug('setting coordinate system type to Right-Handed Rectangular...')
+    command.SetCoordinateSystemType(ES_CS_RHR)  # one of ES_CoordinateSystemType
 
     logger.debug('setting system settings...')
     settings = SystemSettingsDataT()
@@ -95,6 +95,7 @@ def set_refraction_index(command):
 
     env_params = command.GetEnvironmentParams()
     index_of_refraction = ciddor_and_hill(env_params)
+    refraction_params.dIfmRefractionIndex = index_of_refraction
     command.SetRefractionParams(refraction_params)
 
 def measure(command, setiof=False):
@@ -119,11 +120,9 @@ def loadDSCS(filename):
         cartesian_reflector_coordinates[index,0] = point[0] * math.cos(point[1])
         cartesian_reflector_coordinates[index,1] = point[0] * math.sin(point[1])
         cartesian_reflector_coordinates[index,2] = point[2]
-    return (reflector_names, cartesian_reflector_coordinates)
+    return (numpy.array(reflector_names), cylindrical_reflector_coordinates, cartesian_reflector_coordinates)
 
 def measure_initial_reflectors(command, reflector_names):
-        
-    measure_initial_reflectors(command)
     measurements = []
     target_reflector_names = []
     
@@ -149,23 +148,113 @@ def measure_initial_reflectors(command, reflector_names):
 
 def calculate_transform(reflector_names,        cartesian_DSCS,\
                         target_reflector_names, initial_coordinates_LTCS):
-    return numpy.zeros((4, 4))
+    # extract the associated points from the configured DSCS reference network coordinates
+    initial_coordinates_DSCS = numpy.ndarray((3, 3))
+    for target_index,target_name in enumerate(target_reflector_names):
+        logger.debug(reflector_names)
+        logger.debug(target_name)
+        logger.debug(reflector_names == target_name)
+        initial_coordinates_DSCS[target_index,:] = cartesian_DSCS[reflector_names == target_name,:]
 
-def calculate_approx_LTCS(cartesian_DSCS):
-    return numpy.zeros((5, 3))
+    # calculate the tracker position (S') in the DSCS to use as the fourth point
+    A = initial_coordinates_LTCS[0]
+    B = initial_coordinates_LTCS[1]
+    C = initial_coordinates_LTCS[2]
+    S = numpy.array([0, 0, 0])
+    AB = B-A
+    AC = C-A
+    AS = -A
+    z = numpy.cross(AB, AC)
+    z_hat = z / linalg.norm(z)
+    a = numpy.dot(z_hat, AS)
+    b = numpy.dot(AB, AS)
+    c = numpy.dot(AC, AS)
+    
+    Ap = initial_coordinates_DSCS[0]
+    Bp = initial_coordinates_DSCS[1]
+    Cp = initial_coordinates_DSCS[2]
+    ABp = Bp-Ap
+    ACp = Cp-Ap
+    zp = numpy.cross(ABp, ACp)
+    zp_hat = zp / linalg.norm(zp)
+    M = numpy.vstack([zp_hat, ABp, ACp])
+    M_inv = linalg.inv(M)
+    ASp = numpy.dot(M_inv, numpy.array([a, b, c]))
+    Sp = ASp + Ap
+    logger.debug("S': {}".format(Sp))
+    
+    # calculate the DSCS-to-LTCS transform matrix
+    Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([A, B, C, S]).transpose()])
+    X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Ap, Bp, Cp, Sp]).transpose()])
+    return numpy.dot(Y, linalg.pinv(X))
 
-def scan_reference_network(cartesian_LTCS):
-    return numpy.zeros((5, 3))
+def calculate_approx_LTCS(cartesian_DSCS, transform_matrix):
+    X = numpy.vstack([[1, 1, 1, 1, 1], cartesian_DSCS.transpose()])
+    return numpy.dot(transform_matrix, X)[1:,:].transpose()
 
-def print_configuration():
-    print('Not Implemented!')
+def measurement_to_array(measurement):
+    measurement_array = numpy.ndarray(9)
+    measurement_array[0] = measurement.dVal1
+    measurement_array[1] = measurement.dVal2
+    measurement_array[2] = measurement.dVal3
+    measurement_array[3] = measurement.dStd1
+    measurement_array[4] = measurement.dStd2
+    measurement_array[5] = measurement.dStd3
+    measurement_array[6] = measurement.dTemperature
+    measurement_array[7] = measurement.dPressure
+    measurement_array[8] = measurement.dHumidity
+    return measurement_array
+
+def scan_reference_network(command, cartesian_LTCS):
+    # adjust laser tracker
+    logger.debug('setting coordinate system type to Counter-Clockwise Spherical...')
+    command.SetCoordinateSystemType(ES_CS_SCC)  # one of ES_CoordinateSystemType
+    
+    logger.debug('Cartesian LTCS:\n{}'.format(cartesian_LTCS))
+    spherical_points = numpy.ndarray(numpy.shape(cartesian_LTCS))
+    for index,cartesian_point in enumerate(cartesian_LTCS):
+        spherical_points[index,2] = math.sqrt(numpy.sum(cartesian_point**2))
+        spherical_points[index,0] = math.atan2(cartesian_point[1], cartesian_point[0])
+        spherical_points[index,1] = math.acos(cartesian_point[2]/spherical_points[index,2])
+    logger.debug('Spherical LTCS:\n{}'.format(spherical_points))
+
+    logger.info('Measuring reference network with (both faces)...')
+    measurements_face1 = numpy.ndarray((numpy.shape(cartesian_LTCS)[0], 9))
+    measurements_face2 = numpy.ndarray((numpy.shape(cartesian_LTCS)[0], 9))
+    for index,spherical_point in enumerate(spherical_points):
+        logger.debug('Directing laser to coordinates {}...'.format(spherical_point))
+        command.GoPosition(int(1), spherical_point[0], spherical_point[1], spherical_point[2])
+
+        # the tracker always switches to face 1 after a GoPosition command
+        measurements_face1[index] = measurement_to_array(measure(command))
+
+        # the tracker always switches to face 1 after a GoPosition command
+        command.ChangeFace()
+        measurements_face2[index] = measurement_to_array(measure(command))
+    logger.debug('Face 2 Measurements:\n{}'.format(measurements_face2))
+    logger.debug('Face 1 Measurements:\n{}'.format(measurements_face1))
+
+    # calculate the average coordinates from the two-face measurements
+    spherical_LTCS = numpy.ndarray((numpy.shape(cartesian_LTCS)))
+    for index in range(numpy.shape(measurements_face1)[0]):
+        spherical_LTCS[index] = (measurements_face1[index,:3] + measurements_face2[index,:3]) / 2.0
+    return spherical_LTCS
+
+def print_configuration(spherical_LTCS, cylindrical_DSCS, offset=1):
+    for point_index,point in enumerate(spherical_LTCS):
+        for coordinate_index,coordinate in enumerate(point):
+            print('PredictedLTCSCoordinateSets[{},{}] = {}'.format(point_index+offset, coordinate_index, coordinate))
+
+    for point_index,point in enumerate(cylindrical_DSCS):
+        for coordinate_index,coordinate in enumerate(point):
+            print('MeasuredDSCSCoordinateSets[{},{}] = {}'.format(point_index+offset, coordinate_index, coordinate))
 
 def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     # FIXME: get the DSCS data file from the command line
     filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
-    reflector_names, cartesian_DSCS = loadDSCS(filename)
+    reflector_names, cylindrical_DSCS, cartesian_DSCS = loadDSCS(filename)
 
     connection = LTConnection()
     try:
@@ -180,15 +269,21 @@ def main():
 
         target_reflector_names, initial_coordinates_LTCS = measure_initial_reflectors(command, reflector_names)
         print('Initial LTCS Coordinates:\n{}'.format(initial_coordinates_LTCS.transpose()))
-
+        '''
+        target_reflector_names = ['B2', 'B4', 'B8']
+        initial_coordinates_LTCS = numpy.array([[  2474.9726707,   -8535.6864827,   -5429.81259778],\
+                                                [   125.91585051,   5615.60642652, -14967.48581864],\
+                                                [   130.39720325,    273.51283084,    319.44138543]]).transpose()
+        '''
+    
         transform_matrix = calculate_transform(reflector_names,        cartesian_DSCS,\
                                                target_reflector_names, initial_coordinates_LTCS)
 
-        cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS)
+        cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS, transform_matrix)
 
-        spherical_LTCS = scan_reference_network(cartesian_LTCS)
+        spherical_LTCS = scan_reference_network(command, cartesian_LTCS)
 
-        print_configuration(spherical_LTCS)
+        print_configuration(spherical_LTCS, cylindrical_DSCS)
 
     finally:
         connection.disconnect()

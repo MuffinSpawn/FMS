@@ -122,7 +122,11 @@ print('AC: {}'.format(AC))
 print("AC': {}".format(ACp))
 print("O': {}".format(Op))
 print('All Measured Cartesian LTCS Coordinates:\n{}'.format(P.transpose()))
-print('All Configured LTCS Coordinates (3D LLS):\n{}'.format(Y_all))
+print('All Configured LTCS Coordinates (3D LLS):\n{}'.format(Y_all[1:,:]))
+Y_residuals = Y_all[1:,:]-P.transpose()
+print('All LTCS Coordinates Residuals:\n{}'.format(Y_residuals))
+print('All LTCS Coordinates Residuals Mean:      {:.2f} mm'.format(numpy.mean(Y_residuals)))
+print('All LTCS Coordinates Residuals Std. Dev.:  {:.2f} mm'.format(numpy.std(Y_residuals)))
 
 
 '''
