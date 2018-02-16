@@ -29,11 +29,12 @@ def signal_handler(signal, frame):
         sys.exit(0)
 
 def press_any_key_to_continue():
-    print('<<< Press any key to continue... >>>')
     if platform.system() == 'Windows':
         os.system('pause')
     else:  # assuming Linux
+        print('<<< Press any key to continue... >>>')
         os.system('read -s -n 1')
+    print()
 
 def initialize(command, forceinit=False, manualiof=False):
     units = SystemUnitsDataT()
@@ -72,7 +73,7 @@ def initialize(command, forceinit=False, manualiof=False):
     settings.bApplyStationOrientationParams = int(1)
     settings.bKeepLastPosition = int(1)
     settings.bSendUnsolicitedMessages = int(1)
-    settings.bSendReflectorPositionData = int(1)
+    settings.bSendReflectorPositionData = int(0)
     settings.bTryMeasurementMode = int(0)
     settings.bHasNivel = int(1)
     settings.bHasVideoCamera = int(1)
@@ -129,12 +130,12 @@ def measure_initial_reflectors(command, reflector_names):
     ordinal_strings = ['first', 'second', 'third']
     for index in range(3):
         target_reflector_name = input(\
-            "Enter the name of the {} reference reflector.".format(ordinal_strings[index]))
+            "\nEnter the name of the {} reference reflector:  ".format(ordinal_strings[index]))
         if not target_reflector_name in reflector_names:
             raise Exception('Reflector name does not match any of the configured DSCS reflector names.')
         target_reflector_names.append(target_reflector_name)
         
-        print("Acquire the {} reference reflector.".format(ordinal_strings[index]))
+        print("\nAcquire the {} reference reflector.".format(ordinal_strings[index]))
         press_any_key_to_continue()
         logger.info('Measuring reflector..')
         measurements.append(measure(command, setiof=False))
@@ -240,14 +241,26 @@ def scan_reference_network(command, cartesian_LTCS):
         spherical_LTCS[index] = (measurements_face1[index,:3] + measurements_face2[index,:3]) / 2.0
     return spherical_LTCS
 
-def print_configuration(spherical_LTCS, cylindrical_DSCS, offset=1):
+def print_configuration(transform_matrix, spherical_LTCS, cylindrical_DSCS, offset=1):
     for point_index,point in enumerate(spherical_LTCS):
         for coordinate_index,coordinate in enumerate(point):
-            print('PredictedLTCSCoordinateSets[{},{}] = {}'.format(point_index+offset, coordinate_index, coordinate))
+            if coordinate_index == 2:
+                print('PredictedLTCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+offset, coordinate_index, coordinate))
+            else:
+                print('PredictedLTCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+offset, coordinate_index, coordinate))
 
     for point_index,point in enumerate(cylindrical_DSCS):
         for coordinate_index,coordinate in enumerate(point):
-            print('MeasuredDSCSCoordinateSets[{},{}] = {}'.format(point_index+offset, coordinate_index, coordinate))
+            if coordinate_index == 2:
+                print('MeasuredDSCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+offset, coordinate_index, coordinate))
+            else:
+                print('MeasuredDSCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+offset, coordinate_index, coordinate))
+
+    print('TransformMatrix = NULL')
+    transform_matrix_LTCS_DSCS = linalg.inv(transform_matrix)
+    for row_index,row in enumerate(transform_matrix_LTCS_DSCS):
+        for element_index,element in enumerate(row):
+            print('TransformMatrix[{},{}] = {:.6f}'.format(row_index, element_index, element))
 
 def main():
     signal.signal(signal.SIGINT, signal_handler)
@@ -283,7 +296,7 @@ def main():
 
         spherical_LTCS = scan_reference_network(command, cartesian_LTCS)
 
-        print_configuration(spherical_LTCS, cylindrical_DSCS)
+        print_configuration(transform_matrix, spherical_LTCS, cylindrical_DSCS)
 
     finally:
         connection.disconnect()
