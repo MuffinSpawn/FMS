@@ -16,9 +16,10 @@ import sys
 import platform
 import time
 
-from CESAPI.connection import *
-from CESAPI.command import *
+import CESAPI.connection
+import CESAPI.command
 from CESAPI.packet import *
+import CESAPI.refract
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,30 +80,8 @@ def initialize(command, forceinit=False, manualiof=False):
     settings.bHasVideoCamera = int(1)
     command.SetSystemSettings(settings)
 
-# TODO: implement Ciddor & Hill with IOF update trick
-def ciddor_and_hill(env_params):
-    return 0.0
-
-def set_refraction_index(command):
-    min_refraction_index = 1.000150
-    max_refraction_index = 1.000331
-    mid_refraction_index = (min_refraction_index + max_refraction_index)/2.0
-    refraction_params = command.GetRefractionParams()
-    if refraction_params.dIfmRefractionIndex <= mid_refraction_index:
-        refraction_params.dIfmRefractionIndex = max_refraction_index
-    else:
-        refraction_params.dIfmRefractionIndex = min_refraction_index
-    command.SetRefractionParams(refraction_params)
-
-    env_params = command.GetEnvironmentParams()
-    index_of_refraction = ciddor_and_hill(env_params)
-    refraction_params.dIfmRefractionIndex = index_of_refraction
-    command.SetRefractionParams(refraction_params)
-
-def measure(command, setiof=False):
-        if setiof:
-            set_refraction_index(command)
-
+def measure(command, rialg=None):
+        CESAPI.refract.SetRefractionIndex(command, rialg)
         return command.StartMeasurement()
 
 def loadDSCS(filename):
@@ -298,12 +277,12 @@ def main():
     filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
     reflector_names, cylindrical_DSCS, cartesian_DSCS = loadDSCS(filename)
 
-    connection = LTConnection()
+    connection = CESAPI.connection.Connection()
     try:
         logger.info('Connecting to the laser tracker...')
         connection.connect()
-        command = CommandSync(connection)
-        '''
+        command = CESAPI.command.CommandSync(connection)
+        
         print("Acquire an initialization reflector.")
         press_any_key_to_continue()
         logger.info('Initializing laser tracker...')
@@ -316,7 +295,7 @@ def main():
         initial_coordinates_LTCS = numpy.array([[  2474.9726707,   -8535.6864827,   -5429.81259778],\
                                                 [   125.91585051,   5615.60642652, -14967.48581864],\
                                                 [   130.39720325,    273.51283084,    319.44138543]]).transpose()
-        
+        '''
     
         transform_matrix = calculate_transform(reflector_names,        cartesian_DSCS,\
                                                target_reflector_names, initial_coordinates_LTCS)
@@ -324,7 +303,7 @@ def main():
 
         cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS, transform_matrix)
 
-        '''
+        
         spherical_LTCS = scan_reference_network(command, cartesian_LTCS)
         logger.info('Spherical LTCS:\n{}'.format(spherical_LTCS))
         '''
@@ -333,6 +312,7 @@ def main():
                                       [  2.55967949e+00,   1.54402986e+00,   1.02209367e+04],
                                       [ -2.61766113e+00,   1.55445999e+00,   1.86843429e+04],
                                       [ -1.91881327e+00,   1.55073447e+00,   1.59251319e+04]])
+        '''
 
         _,_,prop_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\prop_network.csv')
         logger.info('Prop Cartesian DSCS:\n{}'.format(prop_cartesian_DSCS))
