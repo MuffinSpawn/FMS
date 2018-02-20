@@ -117,7 +117,7 @@ def measure_initial_reflectors(command, reflector_names):
         print("\nAcquire the {} reference reflector.".format(ordinal_strings[index]))
         press_any_key_to_continue()
         logger.info('Measuring reflector..')
-        measurements.append(measure(command, setiof=False))
+        measurements.append(measure(command, rialg=CESAPI.refract.RI_ALG_Leica))
 
     initial_coordinates_LTCS = numpy.ndarray((3, 3))
     for index,measurement in enumerate(measurements):
@@ -270,6 +270,39 @@ def print_configuration(transform_matrix, ref_spherical_LTCS, ref_cylindrical_DS
         for element_index,element in enumerate(row):
             print('TransformMatrix[{},{}] = {:.6f}'.format(row_index, element_index, element))
 
+def test():
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # FIXME: get the DSCS data file from the command line
+    filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
+    reflector_names, cylindrical_DSCS, cartesian_DSCS = loadDSCS(filename)
+
+    target_reflector_names = ['B2', 'B4', 'B8']
+    initial_coordinates_LTCS = numpy.array([[  2474.9726707,   -8535.6864827,   -5429.81259778],\
+                                            [   125.91585051,   5615.60642652, -14967.48581864],\
+                                            [   130.39720325,    273.51283084,    319.44138543]]).transpose()
+
+    transform_matrix = calculate_transform(reflector_names,        cartesian_DSCS,\
+                                           target_reflector_names, initial_coordinates_LTCS)
+    logger.debug('DSCS-to-LTCS Transform Matrix:\n{}'.format(transform_matrix))
+
+    spherical_LTCS = numpy.array([[  5.07929038e-02,   1.51822728e+00,   2.48166245e+03],
+                                  [  2.35150483e+00,   1.56739118e+00,   4.16201919e+03],
+                                  [  2.55967949e+00,   1.54402986e+00,   1.02209367e+04],
+                                  [ -2.61766113e+00,   1.55445999e+00,   1.86843429e+04],
+                                  [ -1.91881327e+00,   1.55073447e+00,   1.59251319e+04]])
+    logger.info('Spherical LTCS:\n{}'.format(spherical_LTCS))
+
+    _,_,prop_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\prop_network.csv')
+    logger.info('Prop Cartesian DSCS:\n{}'.format(prop_cartesian_DSCS))
+    prop_spherical_LTCS = convert_network_to_LTCS(transform_matrix, prop_cartesian_DSCS)
+
+    _,_,ds_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\ds_network.csv')
+    logger.info('DS Cartesian DSCS:\n{}'.format(ds_cartesian_DSCS))
+    ds_spherical_LTCS = convert_network_to_LTCS(transform_matrix, ds_cartesian_DSCS)
+
+    print_configuration(transform_matrix, spherical_LTCS, cylindrical_DSCS, prop_spherical_LTCS, ds_spherical_LTCS)
+
 def main():
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -290,12 +323,6 @@ def main():
 
         target_reflector_names, initial_coordinates_LTCS = measure_initial_reflectors(command, reflector_names)
         print('Initial LTCS Coordinates:\n{}'.format(initial_coordinates_LTCS.transpose()))
-        '''
-        target_reflector_names = ['B2', 'B4', 'B8']
-        initial_coordinates_LTCS = numpy.array([[  2474.9726707,   -8535.6864827,   -5429.81259778],\
-                                                [   125.91585051,   5615.60642652, -14967.48581864],\
-                                                [   130.39720325,    273.51283084,    319.44138543]]).transpose()
-        '''
     
         transform_matrix = calculate_transform(reflector_names,        cartesian_DSCS,\
                                                target_reflector_names, initial_coordinates_LTCS)
@@ -303,16 +330,8 @@ def main():
 
         cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS, transform_matrix)
 
-        
         spherical_LTCS = scan_reference_network(command, cartesian_LTCS)
         logger.info('Spherical LTCS:\n{}'.format(spherical_LTCS))
-        '''
-        spherical_LTCS = numpy.array([[  5.07929038e-02,   1.51822728e+00,   2.48166245e+03],
-                                      [  2.35150483e+00,   1.56739118e+00,   4.16201919e+03],
-                                      [  2.55967949e+00,   1.54402986e+00,   1.02209367e+04],
-                                      [ -2.61766113e+00,   1.55445999e+00,   1.86843429e+04],
-                                      [ -1.91881327e+00,   1.55073447e+00,   1.59251319e+04]])
-        '''
 
         _,_,prop_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\prop_network.csv')
         logger.info('Prop Cartesian DSCS:\n{}'.format(prop_cartesian_DSCS))

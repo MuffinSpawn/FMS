@@ -11,7 +11,7 @@ import numpy.linalg as linalg
 import matplotlib.pyplot as plt
 
 # Measured Spherical LTCS Coordinates
-filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network_LTCS.csv'
+filename = 'reference_network_LTCS.csv'
 with open(filename, 'r') as file:
     string_data = list(csv.reader(file, delimiter=','))
 
@@ -35,7 +35,7 @@ H = numpy.hstack([P[0,2], P[2,2], P[3,2]])-P[0,2]
 print('H: {}'.format(H))
 
 # Configured Cylindrical DSCS Coordinates
-filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
+filename = 'reference_network.csv'
 with open(filename, 'r') as file:
     string_data = list(csv.reader(file, delimiter=','))
 
@@ -109,9 +109,13 @@ M_inv = linalg.inv(M)
 AOp = numpy.dot(M_inv, numpy.array([a, b, c]))
 Op = AOp + Ap
 
-Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([P[0], P[2], P[4], O]).transpose()])
 X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Pp[0], Pp[2], Pp[4], Op]).transpose()])
+print('X (Cartesian DSCS):\n{}'.format(X))
+Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([P[0], P[2], P[4], O]).transpose()])
+print('Y (Cartesian LTCS):\n{}'.format(Y))
 T = numpy.dot(Y, linalg.pinv(X))
+print('DSCS-to-LTCS Transform Matrix:\n{}'.format(T))
+
 Y_all = numpy.dot(T, X_all)
 
 print('z_hat: {}'.format(z_hat))
