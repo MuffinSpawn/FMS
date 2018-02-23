@@ -28,11 +28,97 @@ import CESAPI.refract
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 def signal_handler(signal, frame):
         print('You pressed Ctrl+C!')
         sys.exit(0)
+
+class MeasurementSet(collections.Sequence):
+    def __init__(self, command, num_measurements=0, labels=[], label_entry=None, rialg=CESAPI.refract.RI_ALG_Leica):
+        self.__command = command
+        self.__measurements = numpy.ndarray((num_measurements, 3))
+        self.__labels = labels
+        self.__label_entry = label_entry
+        self.__refraction_index_algorithm = CESAPI.refract.AlgorithmFactory().refractionIndexAlgorithm(rialg)
+
+    def __len__(self):
+        return numpy.shape(self.__measurements)[0]
+
+    def __getitem__(self, measurement_index):
+        return self.__measurements[measurement_index]
+
+    def __str__(self):
+        stringlets = []
+        for label,measurement in zip(self.__labels,self.__measurements):
+            stringlets.append('{},{},{},{}'.format(label, *measurement))
+        return '\n'.join(stringlets)
+
+    def labels(self):
+        return list(self.__labels)
+
+    def measure(self, index=-1, append=False):
+        coordinate_system_type = self.__command.GetCoordinateSystemType().coordSysType
+        if coordinate_system_type != ES_CS_RHR:
+            logger.debug('setting coordinate system type to Right-Handed Rectangular...')
+            self.__command.SetCoordinateSystemType(ES_CS_RHR)  # one of ES_CoordinateSystemType
+        measurement = measurement_to_array(measure(self.__command, rialg=self.__refraction_index_algorithm))
+        logger.debug('Measurement array:\n{}'.format(measurement))
+        if append:
+            # determine what the label should be
+            label = 'REFLECTOR#{}'.format(numpy.shape(self.__measurements)[0])
+            if self.__label_entry != None:
+                label = self.__label_entry.get()
+
+            # replace or append the measurement and its label
+            try:
+                logger.debug('Replacing measurement...')
+                index = self.__labels.index(label)
+                self.__measurements[index] = measurement[:3]
+            except ValueError:
+                logger.debug('Appending measurement...')
+                self.__labels.append(label)
+                self.__measurements = numpy.vstack((self.__measurements, measurement[:3]))
+        else:
+            self.__measurements[index] = measurement[:3]
+            if len(self.__labels) >= index:
+                self.__labels[index].configure(background='green')
+                self.__labels[index].configure(foreground='white')
+        logger.debug('MeasurementSet after measure():\n{}'.format(self))
+
+def calculate_approx_LTCS(cartesian_DSCS, transform_matrix):
+    ones = numpy.ones(numpy.shape(cartesian_DSCS)[0])
+    X = numpy.vstack([ones, cartesian_DSCS.transpose()])
+    return numpy.dot(transform_matrix, X)[1:,:].transpose()
+
+def cartesian_to_spherical(cartesian_LTCS):
+    spherical_LTCS = numpy.ndarray(numpy.shape(cartesian_LTCS))
+    for index,cartesian_point in enumerate(cartesian_LTCS):
+        spherical_LTCS[index,2] = math.sqrt(numpy.sum(cartesian_point**2))
+        spherical_LTCS[index,0] = math.atan2(cartesian_point[1], cartesian_point[0])
+        spherical_LTCS[index,1] = math.acos(cartesian_point[2]/spherical_LTCS[index,2])
+    return spherical_LTCS
+
+def cartesian_to_cylindrical(cartesian_DSCS):
+    cylindrical_DSCS = numpy.ndarray(numpy.shape(cartesian_DSCS))
+    for index,cartesian_point in enumerate(cartesian_DSCS):
+        cylindrical_DSCS[index,0] = math.sqrt(numpy.sum(cartesian_point[:2]**2))
+        cylindrical_DSCS[index,1] = math.atan2(cartesian_point[1], cartesian_point[0])
+        cylindrical_DSCS[index,2] = cylindrical_DSCS[index,2]
+    return cylindrical_DSCS
+
+def measurement_to_array(measurement):
+    measurement_array = numpy.ndarray(9)
+    measurement_array[0] = measurement.dVal1
+    measurement_array[1] = measurement.dVal2
+    measurement_array[2] = measurement.dVal3
+    measurement_array[3] = measurement.dStd1
+    measurement_array[4] = measurement.dStd2
+    measurement_array[5] = measurement.dStd3
+    measurement_array[6] = measurement.dTemperature
+    measurement_array[7] = measurement.dPressure
+    measurement_array[8] = measurement.dHumidity
+    return measurement_array
 
 def generate_ref_data_filenames(ref_network_DSCS_filename):
     ext_index = ref_network_DSCS_filename.rfind('.')
@@ -188,24 +274,6 @@ def calculate_transform(reflector_names,        cartesian_DSCS,\
     Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Ap, Bp, Cp, Sp]).transpose()])
     return numpy.dot(Y, linalg.pinv(X))
 
-def calculate_approx_LTCS(cartesian_DSCS, transform_matrix):
-    ones = numpy.ones(numpy.shape(cartesian_DSCS)[0])
-    X = numpy.vstack([ones, cartesian_DSCS.transpose()])
-    return numpy.dot(transform_matrix, X)[1:,:].transpose()
-
-def measurement_to_array(measurement):
-    measurement_array = numpy.ndarray(9)
-    measurement_array[0] = measurement.dVal1
-    measurement_array[1] = measurement.dVal2
-    measurement_array[2] = measurement.dVal3
-    measurement_array[3] = measurement.dStd1
-    measurement_array[4] = measurement.dStd2
-    measurement_array[5] = measurement.dStd3
-    measurement_array[6] = measurement.dTemperature
-    measurement_array[7] = measurement.dPressure
-    measurement_array[8] = measurement.dHumidity
-    return measurement_array
-
 def scan_reference_network(command, ref_network_DSCS_filename_entry, reflector_name_selections, initial_measurements, labels, status_label=None):
     ref_network_DSCS_filename = ref_network_DSCS_filename_entry.get()
     reflector_names, cylindrical_DSCS, cartesian_DSCS = load_DSCS_coordinates(ref_network_DSCS_filename)
@@ -239,17 +307,13 @@ def scan_reference_network(command, ref_network_DSCS_filename_entry, reflector_n
     command.SetCoordinateSystemType(ES_CS_SCC)  # one of ES_CoordinateSystemType
     
     logger.debug('Cartesian LTCS:\n{}'.format(cartesian_LTCS))
-    spherical_points = numpy.ndarray(numpy.shape(cartesian_LTCS))
-    for index,cartesian_point in enumerate(cartesian_LTCS):
-        spherical_points[index,2] = math.sqrt(numpy.sum(cartesian_point**2))
-        spherical_points[index,0] = math.atan2(cartesian_point[1], cartesian_point[0])
-        spherical_points[index,1] = math.acos(cartesian_point[2]/spherical_points[index,2])
-    logger.debug('Spherical LTCS:\n{}'.format(spherical_points))
+    approx_spherical_LTCS = cartesian_to_spherical(cartesian_LTCS)
+    logger.debug('Spherical LTCS:\n{}'.format(approx_spherical_LTCS))
 
     set_status(status_label, 'Ref. network 2-face measurements...')
     measurements_face1 = numpy.ndarray((numpy.shape(cartesian_LTCS)[0], 9))
     measurements_face2 = numpy.ndarray((numpy.shape(cartesian_LTCS)[0], 9))
-    for index,spherical_point in enumerate(spherical_points):
+    for index,spherical_point in enumerate(approx_spherical_LTCS):
         logger.debug('Directing laser to coordinates {}...'.format(spherical_point))
         command.GoPosition(int(1), spherical_point[0], spherical_point[1], spherical_point[2])
 
@@ -327,13 +391,40 @@ def convert_network_to_LTCS(ref_network_DSCS_filename_entry, network_DSCS_filena
         spherical_LTCS[index,0] = math.atan2(cartesian_point[1], cartesian_point[0])
         spherical_LTCS[index,1] = math.acos(cartesian_point[2]/spherical_LTCS[index,2])
 
-    # TODO: save spherical LTCS coordinates
+    # save spherical LTCS coordinates
     network_LTCS_filename = generate_data_filename(network_DSCS_filename)
     save_coordinates(network_LTCS_filename, reflector_names, spherical_LTCS)
     logger.info('Saved the spherical LTCS coordinates to\n{}'.format(network_LTCS_filename))
     set_status(status_label, 'Saved spherical LTCS coordinates')
 
     return (network_LTCS_filename, reflector_names, spherical_LTCS)
+
+def convert_network_to_DSCS(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, measurements, status_label=None):
+    # load transform
+    ref_network_DSCS_filename = ref_network_DSCS_filename_entry.get()
+    transform_filename, _, _  = generate_ref_data_filenames(ref_network_DSCS_filename)
+    transform = load_matrix(transform_filename)
+
+    # convert measurements to cylindrical DSCS
+    cartesian_LTCS = numpy.ndarray((len(measurements), 3))
+    for point_index,measurement in enumerate(measurements):
+        for coordinate_index,coordinate in enumerate(measurement):
+            cartesian_LTCS[point_index, coordinate_index] = coordinate
+    spherical_LTCS = cartesian_to_spherical(cartesian_LTCS)
+
+    X = numpy.vstack([numpy.ones(numpy.shape(cartesian_LTCS)[0]), cartesian_LTCS.transpose()])
+    cartesian_DSCS = numpy.dot(transform, X)[1:,:].transpose()
+    logger.debug('Other Network Cartesian DSCS:\n{}'.format(cartesian_DSCS))
+    cylindrical_DSCS = cartesian_to_cylindrical(cartesian_DSCS)
+
+    # save DSCS and LTCS coordinates
+    network_DSCS_filename = network_DSCS_filename_entry.get()
+    network_LTCS_filename = generate_data_filename(network_DSCS_filename)
+    save_coordinates(network_LTCS_filename, measurements.labels(), spherical_LTCS)
+    logger.info('Saved the spherical LTCS coordinates to\n{}'.format(network_LTCS_filename))
+    save_coordinates(network_DSCS_filename, measurements.labels(), cylindrical_DSCS)
+    logger.info('Saved the cylindrical DSCS coordinates to\n{}'.format(network_DSCS_filename))
+    set_status(status_label, 'Saved DSCS & LTCS coordinates')
 
 def print_configuration(transform_matrix, ref_spherical_LTCS, ref_cylindrical_DSCS, prop_spherical_LTCS, ds_spherical_LTCS, offset=1):
     for point_index,point in enumerate(ref_spherical_LTCS):
@@ -399,31 +490,6 @@ def test():
     save_matrix(transform_filename, transform_matrix)
     save_matrix(inv_transform_filename, inv_transform_matrix)
     save_coordinates(ref_network_LTCS_filename, reflector_names, spherical_LTCS)
-
-class MeasurementSet(collections.Sequence):
-    def __init__(self, command, num_measurements, labels=[], rialg=CESAPI.refract.RI_ALG_Leica):
-        self.__command = command
-        self.__measurements = numpy.ndarray((num_measurements, 3))
-        self.__labels = labels
-        self.__refraction_index_algorithm = CESAPI.refract.AlgorithmFactory().refractionIndexAlgorithm(rialg)
-
-    def __len__(self):
-        return numpy.shape(self.__measurements)[0]
-
-    def __getitem__(self, measurement_index):
-        return self.__measurements[measurement_index]
-
-    def measure(self, index):
-        coordinate_system_type = self.__command.GetCoordinateSystemType().coordSysType
-        if coordinate_system_type != ES_CS_RHR:
-            logger.debug('setting coordinate system type to Right-Handed Rectangular...')
-            self.__command.SetCoordinateSystemType(ES_CS_RHR)  # one of ES_CoordinateSystemType
-        measurement = measurement_to_array(measure(self.__command, rialg=self.__refraction_index_algorithm))
-        logger.debug('Measurement array:\n{}'.format(measurement))
-        self.__measurements[index] = measurement[:3]
-        if len(self.__labels) >= index:
-            self.__labels[index].configure(background='green')
-            self.__labels[index].configure(foreground='white')
 
 def browse_csv_files(entry):
     csv_filename = tkfile.askopenfilename(filetype=(("CSV files", ".csv"),))
@@ -493,27 +559,41 @@ def build_other_network_page(notebook, command, ref_network_DSCS_filename_entry)
     page.columnconfigure(1, minsize=100)
     page.columnconfigure(2, minsize=100)
     page.columnconfigure(3, minsize=100)
-    page.rowconfigure(1, minsize=60)
+    page.rowconfigure(1, minsize=30)
+    page.rowconfigure(2, minsize=30)
+    page.rowconfigure(3, minsize=30)
     notebook.add(page, text="Other Network")
 
+    # data filename input
     tk.Label(page, text='DSCS Data File').grid(row=0)
     network_DSCS_filename_entry = tk.Entry(page)
     network_DSCS_filename_entry.grid(row=0, column=1, columnspan=2, sticky='WE')
     button = tk.Button(page, text='Browse', command=lambda: browse_csv_files(network_DSCS_filename_entry))
     button.grid(row=0, column=3, sticky='WE')
     
-    # filler labels
-    for row in range(3):
-        tk.Label(page, text='').grid(row=row+1, stick='WE')
+    # filler label
+    tk.Label(page, text='').grid(row=1, stick='WE')
+
+    # manual measurement control
+    tk.Label(page, text='Name').grid(row=2)
+    reflector_name_entry = tk.Entry(page)
+    reflector_name_entry.grid(row=2, column=1, columnspan=2, sticky='WE')
+    measurements = MeasurementSet(command, label_entry=reflector_name_entry)
+    button = tk.Button(page, text='Measure', command=lambda: measurements.measure(append=True))
+    button.grid(row=2, column=3, sticky='WE')
+    
+    # filler label
+    tk.Label(page, text='').grid(row=3, stick='WE')
         
 
     tk.Label(page, text='Status').grid(row=7)
     status_label = tk.Label(page, text='Ready', bg='white', fg='blue')
     status_label.grid(row=7, column=1, columnspan=3, sticky='WE')
 
-    tk.Button(page, text='Convert', command=lambda: convert_network_to_LTCS(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=status_label)).grid(row=4, column=0, sticky='WE', pady=4)
+    tk.Button(page, text='DSCS to LTCS', command=lambda: convert_network_to_LTCS(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=status_label)).grid(row=4, column=0, sticky='WE', pady=4)
     tk.Button(page, text='Initialize', command=lambda: initialize(command, manualiof=False, status_label=status_label)).grid(row=4, column=1, sticky='WE', pady=4)
     tk.Button(page, text='Scan', command=lambda: scan_other_network(command, ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=status_label)).grid(row=4, column=2, sticky='WE', pady=4)
+    tk.Button(page, text='LTCS to DSCS', command=lambda: convert_network_to_DSCS(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, measurements, status_label=status_label)).grid(row=4, column=3, sticky='WE', pady=4)
 
 def main():
     # signal.signal(signal.SIGINT, signal_handler)
