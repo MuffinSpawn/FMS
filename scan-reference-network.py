@@ -5,6 +5,7 @@ Created on Thu Feb  1 16:05:49 2018
 @author: Peter G. Lane (petergwinlane@gmail.com)
 """
 
+import argparse
 import csv
 import logging
 import math
@@ -29,6 +30,18 @@ def signal_handler(signal, frame):
         print('You pressed Ctrl+C!')
         sys.exit(0)
 
+def determine_data_filenames():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename', help='the CSV file path of the DSCS reference network coordinates')
+    args = parser.parse_args()
+    ref_network_DSCS_filename = args.filename
+    
+    ext_index = ref_network_DSCS_filename.rfind('.')
+    transform_filename = ref_network_DSCS_filename[:ext_index] + '_transform.csv'
+    inv_transform_filename = ref_network_DSCS_filename[:ext_index] + '_inv_transform.csv'
+    ref_network_LTCS_filename = ref_network_DSCS_filename[:ext_index] + '_LTCS.csv'
+    return (ref_network_DSCS_filename, transform_filename, inv_transform_filename, ref_network_LTCS_filename)
+
 def press_any_key_to_continue():
     if platform.system() == 'Windows':
         os.system('pause')
@@ -52,6 +65,14 @@ def initialize(command, forceinit=False, manualiof=False):
     if forceinit or status.trackerProcessorStatus != ES_TPS_Initialized:  # ES_TrackerProcessorStatus
         logger.debug('Initializing...')
         command.Initialize()
+        # At least the AT401 seems to complain about an unknown command failing due to "the sensor" not being stable
+        # on the next command after an initialize. The tracker is fine after that, so just ignore this as a bug in the firmware.
+        try:
+            status = command.GetSystemStatus()
+            logger.debug('Tracker Processor Status: {}'.format(status.trackerProcessorStatus))
+        except Exception as e:
+            if not 'Command 64' in str(e):
+                raise e
     
     logger.debug('setting measurement mode...')
     command.SetMeasurementMode(ES_MM_Stationary)  # ES_MeasMode (only choice for AT4xx)
@@ -103,6 +124,7 @@ def loadDSCS(filename):
     return (numpy.array(reflector_names), cylindrical_reflector_coordinates, cartesian_reflector_coordinates)
 
 def measure_initial_reflectors(command, reflector_names):
+    refraction_index_algorithm = CESAPI.refract.AlgorithmFactory().refractionIndexAlgorithm(CESAPI.refract.RI_ALG_Leica)
     measurements = []
     target_reflector_names = []
     
@@ -117,7 +139,7 @@ def measure_initial_reflectors(command, reflector_names):
         print("\nAcquire the {} reference reflector.".format(ordinal_strings[index]))
         press_any_key_to_continue()
         logger.info('Measuring reflector..')
-        measurements.append(measure(command, rialg=CESAPI.refract.RI_ALG_Leica))
+        measurements.append(measure(command, rialg=refraction_index_algorithm))
 
     initial_coordinates_LTCS = numpy.ndarray((3, 3))
     for index,measurement in enumerate(measurements):
@@ -164,12 +186,13 @@ def calculate_transform(reflector_names,        cartesian_DSCS,\
     logger.debug("S': {}".format(Sp))
     
     # calculate the DSCS-to-LTCS transform matrix
-    Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([A, B, C, S]).transpose()])
-    X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Ap, Bp, Cp, Sp]).transpose()])
+    X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([A, B, C, S]).transpose()])
+    Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Ap, Bp, Cp, Sp]).transpose()])
     return numpy.dot(Y, linalg.pinv(X))
 
 def calculate_approx_LTCS(cartesian_DSCS, transform_matrix):
-    X = numpy.vstack([[1, 1, 1, 1, 1], cartesian_DSCS.transpose()])
+    ones = numpy.ones(numpy.shape(cartesian_DSCS)[0])
+    X = numpy.vstack([ones, cartesian_DSCS.transpose()])
     return numpy.dot(transform_matrix, X)[1:,:].transpose()
 
 def measurement_to_array(measurement):
@@ -270,14 +293,28 @@ def print_configuration(transform_matrix, ref_spherical_LTCS, ref_cylindrical_DS
         for element_index,element in enumerate(row):
             print('TransformMatrix[{},{}] = {:.6f}'.format(row_index, element_index, element))
 
+def save_matrix(filename, matrix):
+    with open(filename, 'w') as file:
+        for row in matrix:
+            line = ','.join(map(str, row)) + '\n'
+            file.write(line)
+
+def save_coordinates(filename, names, coordinates):
+    with open(filename, 'w') as file:
+        for name,point in zip(names, coordinates):
+            row = numpy.hstack((name, point))
+            line = ','.join(map(str, row)) + '\n'
+            file.write(line)
+
 def test():
     signal.signal(signal.SIGINT, signal_handler)
 
-    # FIXME: get the DSCS data file from the command line
-    filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
-    reflector_names, cylindrical_DSCS, cartesian_DSCS = loadDSCS(filename)
+    ref_network_DSCS_filename, transform_filename, inv_transform_filename, ref_network_LTCS_filename \
+        = determine_data_filenames()
 
-    target_reflector_names = ['B2', 'B4', 'B8']
+    reflector_names, cylindrical_DSCS, cartesian_DSCS = loadDSCS(ref_network_DSCS_filename)
+
+    target_reflector_names = ['ref#1', 'ref#2', 'ref#3']
     initial_coordinates_LTCS = numpy.array([[  2474.9726707,   -8535.6864827,   -5429.81259778],\
                                             [   125.91585051,   5615.60642652, -14967.48581864],\
                                             [   130.39720325,    273.51283084,    319.44138543]]).transpose()
@@ -293,22 +330,17 @@ def test():
                                   [ -1.91881327e+00,   1.55073447e+00,   1.59251319e+04]])
     logger.info('Spherical LTCS:\n{}'.format(spherical_LTCS))
 
-    _,_,prop_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\prop_network.csv')
-    logger.info('Prop Cartesian DSCS:\n{}'.format(prop_cartesian_DSCS))
-    prop_spherical_LTCS = convert_network_to_LTCS(transform_matrix, prop_cartesian_DSCS)
-
-    _,_,ds_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\ds_network.csv')
-    logger.info('DS Cartesian DSCS:\n{}'.format(ds_cartesian_DSCS))
-    ds_spherical_LTCS = convert_network_to_LTCS(transform_matrix, ds_cartesian_DSCS)
-
-    print_configuration(transform_matrix, spherical_LTCS, cylindrical_DSCS, prop_spherical_LTCS, ds_spherical_LTCS)
+    save_matrix(transform_filename, transform_matrix)
+    save_matrix(inv_transform_filename, inv_transform_matrix)
+    save_coordinates(ref_network_LTCS_filename, reflector_names, spherical_LTCS)
 
 def main():
     signal.signal(signal.SIGINT, signal_handler)
 
-    # FIXME: get the DSCS data file from the command line
-    filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\reference_network.csv'
-    reflector_names, cylindrical_DSCS, cartesian_DSCS = loadDSCS(filename)
+    ref_network_DSCS_filename, transform_filename, inv_transform_filename, ref_network_LTCS_filename \
+        = determine_data_filenames()
+
+    reflector_names, cylindrical_DSCS, cartesian_DSCS = loadDSCS(ref_network_DSCS_filename)
 
     connection = CESAPI.connection.Connection()
     try:
@@ -322,26 +354,21 @@ def main():
         initialize(command, manualiof=False)
 
         target_reflector_names, initial_coordinates_LTCS = measure_initial_reflectors(command, reflector_names)
-        print('Initial LTCS Coordinates:\n{}'.format(initial_coordinates_LTCS.transpose()))
+        logger.debug('Initial LTCS Coordinates:\n{}'.format(initial_coordinates_LTCS.transpose()))
     
         transform_matrix = calculate_transform(reflector_names,        cartesian_DSCS,\
                                                target_reflector_names, initial_coordinates_LTCS)
-        logger.debug('DSCS-to-LTCS Transform Matrix:\n{}'.format(transform_matrix))
+        logger.debug('LTCS-to-DSCS Transform Matrix:\n{}'.format(transform_matrix))
 
-        cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS, transform_matrix)
+        inv_transform_matrix = linalg.inv(transform_matrix)
+        cartesian_LTCS = calculate_approx_LTCS(cartesian_DSCS, inv_transform_matrix)
 
         spherical_LTCS = scan_reference_network(command, cartesian_LTCS)
-        logger.info('Spherical LTCS:\n{}'.format(spherical_LTCS))
+        logger.debug('Spherical LTCS:\n{}'.format(spherical_LTCS))
 
-        _,_,prop_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\prop_network.csv')
-        logger.info('Prop Cartesian DSCS:\n{}'.format(prop_cartesian_DSCS))
-        prop_spherical_LTCS = convert_network_to_LTCS(transform_matrix, prop_cartesian_DSCS)
-
-        _,_,ds_cartesian_DSCS = loadDSCS('C:\\Users\\fms-local\\Desktop\\FMS\\FMS\\ds_network.csv')
-        logger.info('DS Cartesian DSCS:\n{}'.format(ds_cartesian_DSCS))
-        ds_spherical_LTCS = convert_network_to_LTCS(transform_matrix, ds_cartesian_DSCS)
-
-        print_configuration(transform_matrix, spherical_LTCS, cylindrical_DSCS, prop_spherical_LTCS, ds_spherical_LTCS)
+        save_matrix(transform_filename, transform_matrix)
+        save_matrix(inv_transform_filename, inv_transform_matrix)
+        save_coordinates(ref_network_LTCS_filename, reflector_names, spherical_LTCS)
 
     finally:
         connection.disconnect()
