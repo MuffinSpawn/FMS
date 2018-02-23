@@ -426,7 +426,7 @@ def convert_network_to_DSCS(ref_network_DSCS_filename_entry, network_DSCS_filena
     logger.info('Saved the cylindrical DSCS coordinates to\n{}'.format(network_DSCS_filename))
     set_status(status_label, 'Saved DSCS & LTCS coordinates')
 
-def print_configuration(transform_matrix, ref_spherical_LTCS, ref_cylindrical_DSCS, prop_spherical_LTCS, ds_spherical_LTCS, offset=1):
+def save_configuration(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=None):
     for point_index,point in enumerate(ref_spherical_LTCS):
         for coordinate_index,coordinate in zip([1, 2, 0], point):
             if coordinate_index == 2:
@@ -594,6 +594,52 @@ def build_other_network_page(notebook, command, ref_network_DSCS_filename_entry)
     tk.Button(page, text='Initialize', command=lambda: initialize(command, manualiof=False, status_label=status_label)).grid(row=4, column=1, sticky='WE', pady=4)
     tk.Button(page, text='Scan', command=lambda: scan_other_network(command, ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=status_label)).grid(row=4, column=2, sticky='WE', pady=4)
     tk.Button(page, text='LTCS to DSCS', command=lambda: convert_network_to_DSCS(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, measurements, status_label=status_label)).grid(row=4, column=3, sticky='WE', pady=4)
+    return network_DSCS_filename_entry
+
+def build_config_page(notebook, ref_network_DSCS_filename_entry, network_DSCS_filename_entry):
+    page = ttk.Frame(notebook)
+    page.columnconfigure(0, minsize=100)
+    page.columnconfigure(1, minsize=100)
+    page.columnconfigure(2, minsize=100)
+    page.columnconfigure(3, minsize=100)
+    page.rowconfigure(1, minsize=30)
+    page.rowconfigure(2, minsize=30)
+    page.rowconfigure(3, minsize=30)
+    notebook.add(page, text="Configuration")
+
+    # config filename input
+    tk.Label(page, text='Config File').grid(row=0)
+    config_filename_entry = tk.Entry(page)
+    config_filename_entry.grid(row=0, column=1, columnspan=2, sticky='WE')
+    button = tk.Button(page, text='Browse', command=lambda: browse_csv_files(config_filename_entry))
+    button.grid(row=0, column=3, sticky='WE')
+
+    # reference DSCS filename input
+    tk.Label(page, text='Ref. DSCS File').grid(row=1)
+    ref_DSCS_filename_entry = tk.Entry(page)
+    ref_DSCS_filename_entry.grid(row=1, column=1, columnspan=2, sticky='WE')
+    button = tk.Button(page, text='Browse', command=lambda: browse_csv_files(ref_DSCS_filename_entry))
+    button.grid(row=1, column=3, sticky='WE')
+
+    # propeller DSCS filename input
+    tk.Label(page, text='Prop. DSCS File').grid(row=2)
+    prop_DSCS_filename_entry = tk.Entry(page)
+    prop_DSCS_filename_entry.grid(row=2, column=1, columnspan=2, sticky='WE')
+    button = tk.Button(page, text='Browse', command=lambda: browse_csv_files(prop_DSCS_filename_entry))
+    button.grid(row=2, column=3, sticky='WE')
+
+    # detector DSCS solenoid filename input
+    tk.Label(page, text='DS DSCS File').grid(row=3)
+    ds_DSCS_filename_entry = tk.Entry(page)
+    ds_DSCS_filename_entry.grid(row=3, column=1, columnspan=2, sticky='WE')
+    button = tk.Button(page, text='Browse', command=lambda: browse_csv_files(ds_DSCS_filename_entry))
+    button.grid(row=3, column=3, sticky='WE')
+
+    tk.Label(page, text='Status').grid(row=7)
+    status_label = tk.Label(page, text='Ready', bg='white', fg='blue')
+    status_label.grid(row=7, column=1, columnspan=3, sticky='WE')
+
+    tk.Button(page, text='Generate', command=lambda: save_configuration(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=status_label)).grid(row=4, column=1, columnspan=2, sticky='WE', pady=4)
 
 def main():
     # signal.signal(signal.SIGINT, signal_handler)
@@ -615,6 +661,7 @@ def main():
 
     ref_network_DSCS_filename_entry = build_reference_network_page(notebook, command)
     other_network_DSCS_filename_entry = build_other_network_page(notebook, command, ref_network_DSCS_filename_entry)
+    build_config_page(notebook, ref_network_DSCS_filename_entry, other_network_DSCS_filename_entry)
 
     root.mainloop()
     
