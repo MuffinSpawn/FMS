@@ -166,6 +166,18 @@ def save_matrix(filename, matrix):
             line = ','.join(map(str, row)) + '\n'
             file.write(line)
 
+def load_coordinates(filename):
+    with open(filename, 'r') as file:
+        string_data = list(csv.reader(file, delimiter=','))
+
+    reflector_names = []
+    coordinates = numpy.ndarray((len(string_data), 3))
+    for index,row in enumerate(string_data):
+        reflector_names.append(row[0])
+        point = list(map(lambda x: float(x), row[1:]))
+        coordinates[index,:] = point
+    return reflector_names, coordinates
+
 def save_coordinates(filename, names, coordinates):
     with open(filename, 'w') as file:
         for name,point in zip(names, coordinates):
@@ -426,42 +438,117 @@ def convert_network_to_DSCS(ref_network_DSCS_filename_entry, network_DSCS_filena
     logger.info('Saved the cylindrical DSCS coordinates to\n{}'.format(network_DSCS_filename))
     set_status(status_label, 'Saved DSCS & LTCS coordinates')
 
-def save_configuration(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=None):
-    for point_index,point in enumerate(ref_spherical_LTCS):
-        for coordinate_index,coordinate in zip([1, 2, 0], point):
-            if coordinate_index == 2:
-                print('PredictedLTCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+offset, coordinate_index, coordinate))
-            else:
-                print('PredictedLTCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+offset, coordinate_index, coordinate))
+def save_configuration(config_filename_entry, ref_DSCS_filename_entry, prop_DSCS_filename_entry, ds_DSCS_filename_entry, status_label=None):
+    config_filename = config_filename_entry.get()
+    with open(config_filename, 'w') as config_file:
+        config_file.write('''
+[position]
+FindDelay = 0
+MaxRetries = 1
+SearchRadius = 200
 
-    prop_offset = offset + numpy.shape(ref_spherical_LTCS)[0] + 1
-    for point_index,point in enumerate(prop_spherical_LTCS):
-        for coordinate_index,coordinate in zip([1, 2, 0], point):
-            if coordinate_index == 2:
-                print('PredictedLTCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+prop_offset, coordinate_index, coordinate))
-            else:
-                print('PredictedLTCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+prop_offset, coordinate_index, coordinate))
+SetMemberships = NULL
 
-    ds_offset = offset + numpy.shape(ref_spherical_LTCS)[0] + 9
-    for point_index,point in enumerate(ds_spherical_LTCS):
-        for coordinate_index,coordinate in zip([1, 2, 0], point):
-            if coordinate_index == 2:
-                print('PredictedLTCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+ds_offset, coordinate_index, coordinate))
-            else:
-                print('PredictedLTCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+ds_offset, coordinate_index, coordinate))
+''')
 
-    for point_index,point in enumerate(ref_cylindrical_DSCS):
-        for coordinate_index,coordinate in zip([1, 2, 0], point):
-            if coordinate_index == 2:
-                print('MeasuredDSCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+offset, coordinate_index, coordinate))
-            else:
-                print('MeasuredDSCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+offset, coordinate_index, coordinate))
+        ref_DSCS_filename = ref_DSCS_filename_entry.get()
+        ref_DSCS_data = load_coordinates(ref_DSCS_filename)
+        ref_DSCS_names, ref_network_DSCS = sorted(ref_DSCS_data, key=lambda tup: tup[1])
+        transform_filename, inv_transform_filename, ref_LTCS_filename = generate_ref_data_filenames(ref_DSCS_filename)
+        ref_LTCS_data = load_coordinates(ref_LTCS_filename)
+        ref_LTCS_names, ref_network_LTCS = sorted(ref_LTCS_data, key=lambda tup: tup[1])
+    
+        prop_DSCS_filename = prop_DSCS_filename_entry.get()
+        prop_DSCS_data = load_coordinates(prop_DSCS_filename)
+        prop_DSCS_names, prop_DSCS = sorted(prop_DSCS_data, key=lambda tup: tup[1])
+        prop_LTCS_filename = generate_data_filename(prop_DSCS_filename)
+        prop_LTCS_data = load_coordinates(prop_LTCS_filename)
+        prop_LTCS_names, prop_network_LTCS = sorted(prop_LTCS_data, key=lambda tup: tup[1])
+    
+        ds_DSCS_filename = ds_DSCS_filename_entry.get()
+        ds_DSCS_data = load_coordinates(ds_DSCS_filename)
+        ds_DSCS_names, ds_DSCS = sorted(ds_DSCS_data, key=lambda tup: tup[1])
+        ds_LTCS_filename = generate_data_filename(ds_DSCS_filename)
+        ds_LTCS_data = load_coordinates(ds_LTCS_filename)
+        ds_LTCS_names, ds_network_LTCS = sorted(ds_LTCS_data, key=lambda tup: tup[1])
 
-    print('TransformMatrix = NULL')
-    transform_matrix_LTCS_DSCS = linalg.inv(transform_matrix)
-    for row_index,row in enumerate(transform_matrix_LTCS_DSCS):
-        for element_index,element in enumerate(row):
-            print('TransformMatrix[{},{}] = {:.6f}'.format(row_index, element_index, element))
+        config_file.write('\n# Set membership labels\n')
+        for name_index,name in enumerate(ref_DSCS_names):
+            config_file.write('SetMemberships[{}] = "ref"\n'.format(name_index))
+        for name_index,name in enumerate(prop_DSCS_names):
+            config_file.write('SetMemberships[{}] = "prop"\n'.format(name_index))
+        for name_index,name in enumerate(ds_DSCS_names):
+            config_file.write('SetMemberships[{}] = "ds"\n'.format(name_index))
+        next_index = len(ref_DSCS_names) + len(prop_DSCS_names) + len(ds_DSCS_names)
+    
+        config_file.write('\n# Predicted LTCS coordinate sets\n')
+        config_file.write('PredictedLTCSCoordinateSets = NULL\n\n')
+    
+        config_file.write('# ref (approx. reference network coordinates)\n')
+        for point_index,point in enumerate(ref_network_LTCS):
+            config_file.write('# {}'.format(ref_LTCS_names[point_index]))
+            for coordinate_index,coordinate in zip([1, 2, 0], point):
+                if coordinate_index == 2:
+                    config_file.write('PredictedLTCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+next_index, coordinate_index, coordinate))
+                else:
+                    config_file.write('PredictedLTCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+next_index, coordinate_index, coordinate))
+        next_index += len(ref_DSCS_names)
+
+        config_file.write('# prop (propeller reflectors in home position)\n')
+        for point_index,point in enumerate(prop_network_LTCS):
+            config_file.write('# {}'.format(prop_LTCS_names[point_index]))
+            for coordinate_index,coordinate in zip([1, 2, 0], point):
+                if coordinate_index == 2:
+                    config_file.write('PredictedLTCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+next_index, coordinate_index, coordinate))
+                else:
+                    config_file.write('PredictedLTCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+next_index, coordinate_index, coordinate))
+        next_index += len(prop_DSCS_names)
+    
+        config_file.write('# ds (detector solenoid reflectors)\n')
+        for point_index,point in enumerate(ds_network_LTCS):
+            config_file.write('# {}'.format(ds_LTCS_names[point_index]))
+            for coordinate_index,coordinate in zip([1, 2, 0], point):
+                if coordinate_index == 2:
+                    config_file.write('PredictedLTCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+next_index, coordinate_index, coordinate))
+                else:
+                    config_file.write('PredictedLTCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+next_index, coordinate_index, coordinate))
+    
+        config_file.write('\n# Measured DSCS coordinate sets\n')
+        config_file.write('MeasuredDSCSCoordinateSets = NULL\n\n')
+    
+        config_file.write('# ref\n')
+        next_index = len(ref_DSCS_names) + len(prop_DSCS_names) + len(ds_DSCS_names)
+        for point_index,point in enumerate(ref_network_DSCS):
+            config_file.write('# {}'.format(ref_DSCS_names[point_index]))
+            for coordinate_index,coordinate in zip([1, 2, 0], point):
+                if coordinate_index == 2:
+                    config_file.write('MeasuredDSCSCoordinateSets[{},{}] = {:.3f}'.format(point_index+next_index, coordinate_index, coordinate))
+                else:
+                    config_file.write('MeasuredDSCSCoordinateSets[{},{}] = {:.6f}'.format(point_index+next_index, coordinate_index, coordinate))
+        next_index += len(ref_DSCS_names)
+
+        config_file.write('# prop\n')
+        for point_index,point in enumerate(prop_DSCS):
+            config_file.write('# {}'.format(prop_DSCS_names[point_index]))
+            for coordinate_index,coordinate in zip([0, 1, 2], point):
+                config_file.write('MeasuredDSCSCoordinateSets[{},{}] = 0'.format(point_index+next_index, coordinate_index))
+        next_index += len(prop_DSCS_names)
+
+        config_file.write('# ds\n')
+        for point_index,point in enumerate(ds_DSCS):
+            config_file.write('# {}'.format(ds_LTCS_names[point_index]))
+            for coordinate_index,coordinate in zip([0, 1, 2], point):
+                config_file.write('MeasuredDSCSCoordinateSets[{},{}] = 0'.format(point_index+next_index, coordinate_index))
+            
+
+        config_file.write('\nUseConfiguredTransform = TRUE\n\n')
+        config_file.write('# LTCS -> DSCS transform matrix\n')
+        config_file.write('TransformMatrix = NULL\n')
+    
+        transform_matrix = load_matrix(transform_filename)
+        for row_index,row in enumerate(transform_matrix):
+            for element_index,element in enumerate(row):
+                config_file.write('TransformMatrix[{},{}] = {:.6f}'.format(row_index, element_index, element))
 
 def test():
     signal.signal(signal.SIGINT, signal_handler)
@@ -639,7 +726,7 @@ def build_config_page(notebook, ref_network_DSCS_filename_entry, network_DSCS_fi
     status_label = tk.Label(page, text='Ready', bg='white', fg='blue')
     status_label.grid(row=7, column=1, columnspan=3, sticky='WE')
 
-    tk.Button(page, text='Generate', command=lambda: save_configuration(ref_network_DSCS_filename_entry, network_DSCS_filename_entry, status_label=status_label)).grid(row=4, column=1, columnspan=2, sticky='WE', pady=4)
+    tk.Button(page, text='Generate', command=lambda: save_configuration(config_filename_entry, ref_DSCS_filename_entry, prop_DSCS_filename_entry, ds_DSCS_filename_entry, status_label=status_label)).grid(row=4, column=1, columnspan=2, sticky='WE', pady=4)
 
 def main():
     # signal.signal(signal.SIGINT, signal_handler)
