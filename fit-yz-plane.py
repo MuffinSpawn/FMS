@@ -50,8 +50,12 @@ def initialize(command, forceinit=False, manualiof=False):
     status = command.GetSystemStatus()
     logger.debug('Tracker Processor Status: {}'.format(status.trackerProcessorStatus))
     if forceinit or status.trackerProcessorStatus != ES_TPS_Initialized:  # ES_TrackerProcessorStatus
-        logger.debug('Initializing...')
-        command.Initialize()
+        try:
+            init_result = command.Initialize()
+            logger.debug('Initialize status: {}'.format(init_result.packetInfo.status))
+        except Exception as e:
+            logger.error('Initialize failed: {}'.format(e))
+            return
         # At least the AT401 seems to complain about an unknown command failing due to "the sensor" not being stable
         # on the next command after an initialize. The tracker is fine after that, so just ignore this as a bug in the firmware.
         try:
@@ -114,7 +118,9 @@ def measure_plane_reflectors(command, rialg=CESAPI.refract.RI_ALG_Leica):
     refraction_index_algorithm = CESAPI.refract.AlgorithmFactory().refractionIndexAlgorithm(CESAPI.refract.RI_ALG_Leica)
     measurements = []
     reflector_names = []
-    
+
+    command.FindReflector(1000)
+
     ordinal_strings = ['first', 'second', 'third']
     for index in range(3):
         reflector_name = input(\
@@ -387,7 +393,7 @@ def main():
         print("Acquire an initialization reflector.")
         press_any_key_to_continue()
         logger.info('Initializing laser tracker...')
-        initialize(command, forceinit=True, manualiof=False)
+        initialize(command, forceinit=False, manualiof=False)
 
         reflector_names, plane_coordinates_RHR = measure_plane_reflectors(command)
         logger.debug('Y-Z Plane Cartesian coordinates:\n{}'.format(plane_coordinates_RHR.transpose()))
@@ -399,7 +405,7 @@ def main():
         command.PointLaser(x_hatp[0], x_hatp[1], x_hatp[2])
         command.PointLaser(y_hatp[0], y_hatp[1], y_hatp[2])
         command.PointLaser(z_hatp[0], z_hatp[1], z_hatp[2])
-        command.GoPosition(int(0), plane_coordinates_LTCS[0], plane_coordinates_LTCS[1], plane_coordinates_LTCS[2])
+        command.GoPosition(int(0), plane_coordinates_RHR[0,0], plane_coordinates_RHR[0,1], plane_coordinates_RHR[0,2])
     finally:
         connection.disconnect()
 
