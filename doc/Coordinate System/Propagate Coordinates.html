@@ -1,0 +1,180 @@
+<HTML>
+<HEAD>
+<TITLE>Coordinate System.lvlib:Propagate Coordinates.vi</TITLE>
+<META NAME="Author" CONTENT="">
+<META NAME="GENERATOR" CONTENT="G Development Environment">
+</HEAD>
+<BODY BGCOLOR="#FFFFFF">
+<A NAME="Coordinate System.lvlib:Propagate Coordinates.vi"></A><H2>Coordinate System.lvlib:Propagate Coordinates.vi</H2>
+<P></P>
+<P><IMG SRC="images/Propagate Coordinatesc.png" ALT="Coordinate System.lvlib:Propagate Coordinates.vi"></P>
+<P><IMG SRC="images/Propagate Coordinatesp.png" ALT="Coordinate System.lvlib:Propagate Coordinates.vi"></P>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/c2ddbl.png" ALT="c2ddbl"></P>
+</TD>
+<TD>
+<B>DSCS Coordinate List in</B> <P>Input Detector Solenoid Coordinate System row vectors (rho, theta, z).</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cdbl.png" ALT="cdbl"></P>
+</TD>
+<TD>
+<B>phi (rad)</B> </TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/c2ddbl.png" ALT="c2ddbl"></P>
+</TD>
+<TD>
+<B>Propagation Matrix</B> <P>When applied to a Cartesian column 4-vector matrix in the Detector Solenoid Coordinate System, (rho, theta, z), the vector will be propegated to a point that cooresponds to the rotation and linear displacement specified in Mapper Coordinates. Conversion to/from Cartesian coordinates is done automatically.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cdbl.png" ALT="cdbl"></P>
+</TD>
+<TD>
+<B>Real Matrix Element</B> </TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cerrcodeclst.png" ALT="cerrcodeclst"></P>
+</TD>
+<TD>
+<B>error in</B> <P><B>error in</B> can accept error information wired from VIs previously called. Use this information to decide if any functionality should be bypassed in the event of errors from other VIs.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cbool.png" ALT="cbool"></P>
+</TD>
+<TD>
+<B>status</B> <P><B>status</B> is TRUE (X) if an error occurred or FALSE (checkmark) to indicate a warning or that no error occurred.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ci32.png" ALT="ci32"></P>
+</TD>
+<TD>
+<B>code</B> <P><B>code</B> is the error or warning code.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cstr.png" ALT="cstr"></P>
+</TD>
+<TD>
+<B>source</B> <P><B>source</B> describes the origin of the error or warning.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/i2ddbl.png" ALT="i2ddbl"></P>
+</TD>
+<TD>
+<B>DSCS Coordinates List out</B> <P>Propegated Detector Solenoid Coordinate System row vectors (rho, theta, z).</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/idbl.png" ALT="idbl"></P>
+</TD>
+<TD>
+<B>x2</B> </TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ierrcodeclst.png" ALT="ierrcodeclst"></P>
+</TD>
+<TD>
+<B>error out</B> <P><B>error in</B> can accept error information wired from VIs previously called. Use this information to decide if any functionality should be bypassed in the event of errors from other VIs.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ibool.png" ALT="ibool"></P>
+</TD>
+<TD>
+<B>status</B> <P><B>status</B> is TRUE (X) if an error occurred or FALSE (checkmark) to indicate a warning or that no error occurred.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ii32.png" ALT="ii32"></P>
+</TD>
+<TD>
+<B>code</B> <P><B>code</B> is the error or warning code.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/istr.png" ALT="istr"></P>
+</TD>
+<TD>
+<B>source</B> <P><B>source</B> describes the origin of the error or warning.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+</UL>
+<P><IMG SRC="images/Propagate Coordinatesd.png" ALT="Coordinate System.lvlib:Propagate Coordinates.vi"></P>
+<HR>
+<H3>Position in Hierarchy</H3>
+<P><IMG SRC="images/Propagate Coordinatesh.png" ALT="Coordinate System.lvlib:Propagate Coordinates.vi"></P>
+</BODY>
+</HTML>

@@ -174,7 +174,7 @@ def calculate_transform(coordinates_RHR_in, coordinates_RHR_out):
     Sp = ASp + Ap
     logger.debug("S': {}".format(Sp))
     
-    # calculate the DSCS-to-LTCS transform matrix
+    # calculate the LTCS-to-DSCS transform matrix
     X = numpy.vstack([[1, 1, 1, 1], numpy.vstack([A, B, C, S]).transpose()])
     Y = numpy.vstack([[1, 1, 1, 1], numpy.vstack([Ap, Bp, Cp, Sp]).transpose()])
     return numpy.dot(Y, linalg.pinv(X))
@@ -240,9 +240,9 @@ def transform_network(transform_matrix, coordinates_RHR_in):
 def convert_network_to_SCC(coordinates_RHR):
     coordinates_SCC = numpy.ndarray(numpy.shape(coordinates_RHR))
     for index,cartesian_point in enumerate(coordinates_RHR):
-        coordinates_SCC[index,2] = math.sqrt(numpy.sum(cartesian_point**2))
-        coordinates_SCC[index,0] = math.atan2(cartesian_point[1], cartesian_point[0])
-        coordinates_SCC[index,1] = math.acos(cartesian_point[2]/coordinates_SCC[index,2])
+        coordinates_SCC[index,2] = math.sqrt(numpy.sum(cartesian_point**2))  # r
+        coordinates_SCC[index,0] = math.atan2(cartesian_point[1], cartesian_point[0])  # theta (azimuthal)
+        coordinates_SCC[index,1] = math.acos(cartesian_point[2]/coordinates_SCC[index,2])  # phi (polar)
     return coordinates_SCC
 
 # Convert Right-Handed Rectangular coordinates to Cylindrical Counter-Clockwise coordinates
@@ -314,19 +314,24 @@ def calculate_Euler_angles(R):
     return (theta_x, theta_y, theta_z)
 
 def test():
-    reflector_names = ['ref#1', 'ref#2', 'ref#3']
-    plane_coordinates_RHR = numpy.array([[ 1360.73739987,  1901.47749248,  1903.25874455],\
-                                          [  173.0350783,  -1463.53617024, -1461.46391044],\
-                                          [ -411.45669103,  -413.28267277,   699.28193662]]).transpose()
+    reflector_names = ['REF1', 'REF2', 'REF3']
+    '''
+    plane_coordinates_RHR = numpy.array([[ 1361.06082467,   172.89210929,  -411.51114447],
+                                         [ 1901.78827007, -1463.23106064,  -413.21200562],
+                                         [ 1903.76888187, -1460.93517541,   699.13857103]])
+    '''
+    plane_coordinates_RHR = numpy.array([[ 1901.78827007, -1463.23106064,  -413.21200562],
+                                         [ 1361.06082467,   172.89210929,  -411.51114447],
+                                         [ 1903.76888187, -1460.93517541,   699.13857103]])
 
-    logger.debug('Y-Z Plane Cartesian coordinates:\n{}'.format(plane_coordinates_RHR.transpose()))
+    logger.debug('Y-Z Plane Cartesian coordinates:\n{}'.format(plane_coordinates_RHR))
 
     x_hatp, y_hatp, z_hatp = define_unit_vectors(plane_coordinates_RHR)
-    logger.debug('Cartesian unit vectors:\n{}'.format(numpy.vstack([x_hatp, y_hatp, z_hatp]).transpose()))
+    logger.debug('Cartesian unit vectors:\n{}'.format(numpy.vstack([x_hatp, y_hatp, z_hatp])))
 
     # For confirmation (but mostly for fun), physically point out the three coordinate axes.
-    connection = CESAPI.connection.Connection()
     '''
+    connection = CESAPI.connection.Connection()
     try:
         logger.info('Connecting to the laser tracker...')
         connection.connect()
@@ -337,7 +342,7 @@ def test():
         command.GoPosition(int(0), plane_coordinates_RHR[0,0], plane_coordinates_RHR[0,1], plane_coordinates_RHR[0,2])
     finally:
         connection.disconnect()
-    '''
+
     other_point = numpy.ones((4,1))
     try:
         logger.info('Connecting to the laser tracker...')
@@ -353,33 +358,49 @@ def test():
     other_point[1,0] = measurement[0]
     other_point[2,0] = measurement[1]
     other_point[3,0] = measurement[2]
+    '''
 
     ref_coordinates_RHR = calculate_ref_coordinates(plane_coordinates_RHR, y_hatp, z_hatp)
     logger.debug('Reference Cartesian coordinates:\n{}'.format(ref_coordinates_RHR))
 
+    logger.info('Input Cartesian coordinates:\n{}'.format(plane_coordinates_RHR))
+    logger.info('Output Cartesian coordinates:\n{}'.format(ref_coordinates_RHR))
+
     transform_matrix = calculate_transform(plane_coordinates_RHR, ref_coordinates_RHR)
-    logger.debug('Input Cartesian coordinates:\n{}'.format(plane_coordinates_RHR))
-    logger.debug('Output Cartesian coordinates:\n{}'.format(ref_coordinates_RHR))
-    csv_output = ['Transform Matrix:\n']
+    csv_output = ['LTCS-to-DSCS Transform Matrix:\n']
     for index,row in enumerate(transform_matrix):
         csv_output.append('{},{},{},{}\n'.format(row[0], row[1], row[2], row[3]))
     logger.info(''.join(csv_output))
+
+    inv_transform_matrix = linalg.inv(transform_matrix)
+    csv_output = ['DSCS-to-LTCS Transform Matrix:\n']
+    for index,row in enumerate(inv_transform_matrix):
+        csv_output.append('{},{},{},{}\n'.format(row[0], row[1], row[2], row[3]))
+    logger.info(''.join(csv_output))
+
     tracker_coordinates_RHR = numpy.dot(transform_matrix, [[1.0],[0],[0],[0]])
     logger.info('Calculated tracker Cartesian coordinates:\n{}\n'.format(tracker_coordinates_RHR))    
 
     theta_x, theta_y, theta_z = calculate_Euler_angles(transform_matrix[1:,1:])
     logger.info('Euler angles:\n{}, {}, {}\n'.format(theta_x, theta_y, theta_z))
 
+    ref_coordinates_SCC = convert_network_to_SCC(plane_coordinates_RHR)
+    csv_output = ['Reference Spherical coordinates:\n']
+    for index,point in enumerate(ref_coordinates_SCC):
+        csv_output.append('{},{},{},{}\n'.format(reflector_names[index], point[2], point[0], point[1]))
+    logger.info(''.join(csv_output))
+
     ref_coordinates_CCC = convert_network_to_CCC(ref_coordinates_RHR)
-    csv_output = ['Reference Cylindrical coordinates:\n']
+    csv_output = ['Reference Cylindrical coordinates (defined):\n']
     for index,point in enumerate(ref_coordinates_CCC):
         csv_output.append('{},{},{},{}\n'.format(reflector_names[index], point[0], point[1], point[2]))
     logger.info(''.join(csv_output))
 
-    logger.info('Other Cartesian point coordinates:\n{}\n'.format(other_point))    
-    # other_ref_coordinates_RHR = numpy.dot(transform_matrix, other_point).transpose()[0,1:]
-    other_ref_coordinates_RHR = numpy.dot(transform_matrix, other_point)
-    logger.info('Other Cartesian reference coordinates:\n{}\n'.format(other_ref_coordinates_RHR))    
+    ref_coordinates_CCC = convert_network_to_CCC(numpy.dot(transform_matrix, numpy.vstack(([1, 1, 1], plane_coordinates_RHR.transpose())))[1:,:].transpose())
+    csv_output = ['Reference Cylindrical coordinates (calculated):\n']
+    for index,point in enumerate(ref_coordinates_CCC):
+        csv_output.append('{},{:.3f},{:.6f},{:.3f}\n'.format(reflector_names[index], point[0], point[1], point[2]))
+    logger.info(''.join(csv_output))
 
 def main():
     signal.signal(signal.SIGINT, signal_handler)
@@ -412,18 +433,27 @@ def main():
     ref_coordinates_RHR = calculate_ref_coordinates(plane_coordinates_RHR, y_hatp, z_hatp)
     logger.debug('Reference Cartesian coordinates:\n{}'.format(ref_coordinates_RHR))
 
+    logger.info('Input Cartesian coordinates:\n{}'.format(plane_coordinates_RHR))
+    logger.info('Output Cartesian coordinates:\n{}'.format(ref_coordinates_RHR))
+
     transform_matrix = calculate_transform(plane_coordinates_RHR, ref_coordinates_RHR)
-    logger.debug('Input Cartesian coordinates:\n{}'.format(plane_coordinates_RHR))
-    logger.debug('Output Cartesian coordinates:\n{}'.format(ref_coordinates_RHR))
+
     csv_output = ['Transform Matrix:\n']
     for index,row in enumerate(transform_matrix):
         csv_output.append('{},{},{},{}\n'.format(row[0], row[1], row[2], row[3]))
     logger.info(''.join(csv_output))
+
     tracker_coordinates_RHR = numpy.dot(transform_matrix, [[1.0],[0],[0],[0]])
     logger.info('Calculated tracker Cartesian coordinates:\n{}\n'.format(tracker_coordinates_RHR))    
 
     theta_x, theta_y, theta_z = calculate_Euler_angles(transform_matrix[1:,1:])
     logger.info('Euler angles:\n{}, {}, {}\n'.format(theta_x, theta_y, theta_z))
+
+    ref_coordinates_SCC = convert_network_to_SCC(plane_coordinates_RHR)
+    csv_output = ['Reference Spherical coordinates:\n']
+    for index,point in enumerate(ref_coordinates_SCC):
+        csv_output.append('{},{},{},{}\n'.format(reflector_names[index], point[2], point[0], point[1]))
+    logger.info(''.join(csv_output))
 
     ref_coordinates_CCC = convert_network_to_CCC(ref_coordinates_RHR)
     csv_output = ['Reference Cylindrical coordinates:\n']
@@ -432,4 +462,5 @@ def main():
     logger.info(''.join(csv_output))
 
 if __name__ == '__main__':
-    main()
+    #main()
+    test()

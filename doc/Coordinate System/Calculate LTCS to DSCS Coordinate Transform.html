@@ -1,0 +1,193 @@
+<HTML>
+<HEAD>
+<TITLE>Coordinate System.lvlib:Calculate LTCS to DSCS Coordinate Transform.vi</TITLE>
+<META NAME="Author" CONTENT="">
+<META NAME="GENERATOR" CONTENT="G Development Environment">
+</HEAD>
+<BODY BGCOLOR="#FFFFFF">
+<A NAME="Coordinate System.lvlib:Calculate LTCS to DSCS Coordinate Transform.vi"></A><H2>Coordinate System.lvlib:Calculate LTCS to DSCS Coordinate Transform.vi</H2>
+<P></P>
+<P><IMG SRC="images/Calculate LTCS to DSCS Coordinate Transformc.png" ALT="Coordinate System.lvlib:Calculate LTCS to DSCS Coordinate Transform.vi"></P>
+<P><IMG SRC="images/Calculate LTCS to DSCS Coordinate Transformp.png" ALT="Coordinate System.lvlib:Calculate LTCS to DSCS Coordinate Transform.vi"></P>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/c2ddbl.png" ALT="c2ddbl"></P>
+</TD>
+<TD>
+<B>LTCS Coordinate List</B> <P>Cartesian Laser Tracker Coordinate System row 3-vectors.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cdbl.png" ALT="cdbl"></P>
+</TD>
+<TD>
+<B>Numeric</B> </TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/c2ddbl.png" ALT="c2ddbl"></P>
+</TD>
+<TD>
+<B>DSCS Coordinate List</B> <P>Cartesian Detector Solenoid Coordinate System row 3-vectors.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cdbl.png" ALT="cdbl"></P>
+</TD>
+<TD>
+<B>Numeric</B> </TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cerrcodeclst.png" ALT="cerrcodeclst"></P>
+</TD>
+<TD>
+<B>error in (no error)</B> <P><B>error in</B> describes error conditions that occur before this node runs. This input provides standard error in functionality.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cbool.png" ALT="cbool"></P>
+</TD>
+<TD>
+<B>status</B> <P><B>status</B> is TRUE (X) if an error occurred before this node ran or FALSE (checkmark) to indicate a warning or that no error occurred before this node ran. The default is FALSE.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ci32.png" ALT="ci32"></P>
+</TD>
+<TD>
+<B>code</B> <P><B>code</B> is the error or warning code. The default is 0.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/cstr.png" ALT="cstr"></P>
+</TD>
+<TD>
+<B>source</B> <P><B>source</B> specifies the origin of the error or warning and is, in most cases, the name of the node that produced the error or warning. The default is an empty string.</P>
+</TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/i2ddbl.png" ALT="i2ddbl"></P>
+</TD>
+<TD>
+<B>transform matrix</B> <P>4x4 matrix that converts any Cartesian Laser Tracker Coordinate System column 4-vector matrix to the same but in the Detector Solenoid Coordinate System.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/idbl.png" ALT="idbl"></P>
+</TD>
+<TD>
+<B>Real Matrix Element</B> </TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ierrcodeclst.png" ALT="ierrcodeclst"></P>
+</TD>
+<TD>
+<B>error out</B> <P><B>error in</B> can accept error information wired from VIs previously called. Use this information to decide if any functionality should be bypassed in the event of errors from other VIs.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ibool.png" ALT="ibool"></P>
+</TD>
+<TD>
+<B>status</B> <P><B>status</B> is TRUE (X) if an error occurred or FALSE (checkmark) to indicate a warning or that no error occurred.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/ii32.png" ALT="ii32"></P>
+</TD>
+<TD>
+<B>code</B> <P><B>code</B> is the error or warning code.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/istr.png" ALT="istr"></P>
+</TD>
+<TD>
+<B>source</B> <P><B>source</B> describes the origin of the error or warning.</P>
+<P></P>
+<P>Right-click the <B>error in</B> control on the front panel and select <B>Explain Error</B> or <B>Explain Warning</B> from the shortcut menu for more information about the error.</P>
+</TD>
+</TR>
+</Table>
+</UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/i1ddbl.png" ALT="i1ddbl"></P>
+</TD>
+<TD>
+<B>R^2</B> <P>Coefficient of Determination for each coordinate component, including the constant term.</P>
+</TD>
+</TR>
+</Table>
+<UL>
+<Table>
+<TR valign=TOP>
+<TD>
+<P><IMG SRC="images/idbl.png" ALT="idbl"></P>
+</TD>
+<TD>
+<B>X * Y</B> </TD>
+</TR>
+</Table>
+</UL>
+<P><IMG SRC="images/Calculate LTCS to DSCS Coordinate Transformd.png" ALT="Coordinate System.lvlib:Calculate LTCS to DSCS Coordinate Transform.vi"></P>
+<HR>
+<H3>Position in Hierarchy</H3>
+<P><IMG SRC="images/Calculate LTCS to DSCS Coordinate Transformh.png" ALT="Coordinate System.lvlib:Calculate LTCS to DSCS Coordinate Transform.vi"></P>
+</BODY>
+</HTML>
