@@ -6,7 +6,7 @@
 </HEAD>
 <BODY BGCOLOR="#FFFFFF">
 <A NAME="Coordinate System.lvlib:DSCS to LTCS.vi"></A><H2>Coordinate System.lvlib:DSCS to LTCS.vi</H2>
-<P></P>
+<P>This VI uses the specified 4x4 inverse transform matrix to convert a list of Detector Solenoid Coordinate System (DSCS) coordinates (row vector matrix) into a list of Laser Tracker Coordinate System (LTCS) coordinates. The transform matrix is the literal matrix inverse of the transform matrix which takes LTCS coordinates to the DSCS. The algorithm involves converting the cylindrical DSCS coordinates to Cartesian coordinates, applying the transform matrix, and then converting the Cartesian coordiantes to spherical coordinates.</P>
 <P><IMG SRC="images/DSCS to LTCSc.png" ALT="Coordinate System.lvlib:DSCS to LTCS.vi"></P>
 <P><IMG SRC="images/DSCS to LTCSp.png" ALT="Coordinate System.lvlib:DSCS to LTCS.vi"></P>
 <Table>

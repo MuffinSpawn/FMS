@@ -6,7 +6,9 @@
 </HEAD>
 <BODY BGCOLOR="#FFFFFF">
 <A NAME="Coordinate System.lvlib:Calculate 3_Point LTCS to DSCS Coordinate Transform.vi"></A><H2>Coordinate System.lvlib:Calculate 3-Point LTCS to DSCS Coordinate Transform.vi</H2>
+<P>This VI generates a 4x4 transform matrix between a list of three coordinates (row vector matrix) in the Laser Tracker Coordinates System (LTCS) and a list of three coordinates in the Detector Solenoid Coordinate System (DSCS). The matrix is 4x4 to accomodate both displacement (three components) and a rotation matrix (3x3 matrix) while remaining square and invertible. This requires that a constant component set to 1 must be added to each of the coordinates in order that the vectors can be multiplied by the transform matrix.</P>
 <P></P>
+<P>Furthermore, even though it can be shown that only six vectors are strictly necessary to provide enough information to create a mapping, the least squares fit between the two sets of vectors requires four vectors. This is because the algorithm uses the Moore-Penrose Pseudo Inverse which requires a full rank design matrix of vectors from which it is calculated. Therefore, this VI uses the six vectors to calculate the LTCS origin in the DSCS yielding another vector in each coordinate system. It then uses the Calculate LTCS to DSCS Coordinate Transform VI to create a linear least squares fit between the two sets of four vectors.</P>
 <P><IMG SRC="images/Calculate 3-Point LTCS to DSCS Coordinate Transformc.png" ALT="Coordinate System.lvlib:Calculate 3-Point LTCS to DSCS Coordinate Transform.vi"></P>
 <P><IMG SRC="images/Calculate 3-Point LTCS to DSCS Coordinate Transformp.png" ALT="Coordinate System.lvlib:Calculate 3-Point LTCS to DSCS Coordinate Transform.vi"></P>
 <Table>
