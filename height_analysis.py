@@ -10,24 +10,114 @@ import numpy
 import numpy.linalg as linalg
 # import matplotlib.pyplot as plt
 
+def spherical_to_cartesian(spherical_coordinates):
+    points = spherical_coordinates.transpose()
+    cartesian_coordinates = numpy.ndarray(numpy.shape(points))
+    cartesian_coordinates[0,:] = points[0] * numpy.cos(points[1]) * numpy.sin(points[2])
+    cartesian_coordinates[1,:] = points[0] * numpy.sin(points[1]) * numpy.sin(points[2])
+    cartesian_coordinates[2,:] = points[0] * numpy.cos(points[2])
+    return cartesian_coordinates.transpose()
+
+def cartesian_to_spherical(cartesian_coordinates):
+    points = cartesian_coordinates.transpose()
+    cylindrical_coordinates = numpy.ndarray(numpy.shape(points))
+    cylindrical_coordinates[0] = numpy.sqrt(numpy.sum(points**2), axis=1)
+    cylindrical_coordinates[1] = numpy.arctan(points[1], points[0])
+    cylindrical_coordinates[2] = numpy.arccos(points[2]/cylindrical_coordinates[0])
+    return cylindrical_coordinates.transpose()
+
+def cylindrical_to_cartesian(cylindrical_coordinates):
+    points = cylindrical_coordinates.transpose()
+    cartesian_coordinates = numpy.ndarray(numpy.shape(points))
+    cartesian_coordinates[0] = points[0] * numpy.cos(points[1])
+    cartesian_coordinates[1] = points[0] * numpy.sin(points[1])
+    cartesian_coordinates[2] = points[2]
+    return cartesian_coordinates.transpose()
+
+def cartesian_to_cylindrical(cartesian_coordinates):
+    points = cartesian_coordinates.transpose()
+    cylindrical_coordinates = numpy.ndarray(numpy.shape(points))
+    cylindrical_coordinates[0] = numpy.sqrt(points[0]**2 + points[1]**2)
+    cylindrical_coordinates[1] = numpy.arctan2(points[1], points[0])
+    cylindrical_coordinates[2] = points[2]
+    return cylindrical_coordinates.transpose()
+
+def calculate_transform(spherical_LTCS_coordinates, cylindrical_DSCS_coordinates):
+    cartesian_LTCS_coordinates = spherical_to_cartesian(spherical_LTCS_coordinates)
+    cartesian_DSCS_coordinates = cylindrical_to_cartesian(cylindrical_DSCS_coordinates)
+
+    # calculate the LTCS-to-DSCS transform matrix
+    constant_vector = numpy.ones(numpy.shape(cartesian_LTCS_coordinates)[0])
+    X = numpy.vstack([constant_vector, cartesian_LTCS_coordinates.transpose()])
+    Y = numpy.vstack([constant_vector, cartesian_DSCS_coordinates.transpose()])
+    print('X:\n{}'.format(X))
+    print('Y:\n{}'.format(Y))
+    print('pinv(x):{}'.format(linalg.pinv(X)))
+    transform = numpy.dot(Y, linalg.pinv(X))
+    print('Transform: {}'.format(transform))
+    
+    projection_matrix = numpy.dot(linalg.pinv(X), X)
+    print('Projection ("Hat") Matrix:\n{}'.format(projection_matrix))
+    
+
+    Yp = numpy.dot(transform, X)
+    print('Yp: {}'.format(Yp))
+    
+    means = numpy.mean(Y, axis=1)
+    print('Mean: {}'.format(means))
+    total_sum_of_squares = numpy.sum((Y.transpose() - means)**2, axis=0)
+    total_sum_of_squares[0] = 1.0e12
+    print('TSS: {}'.format(total_sum_of_squares))
+    
+    residuals = Y - Yp
+    print('Residuals: {}'.format(residuals))
+    ''' The normal R^2 is not expressive enough to indicate bad mappings.
+    residual_sum_of_squares = numpy.sum(residuals**2, axis=1)
+    print('RSS: {}'.format(residual_sum_of_squares))
+    # r_squared = 1 - residual_sum_of_squares / total_sum_of_squares
+    '''
+
+    print('1-leverage: {}'.format(1-projection_matrix.diagonal()))
+    predictive_residuals = residuals/(1-projection_matrix.diagonal())
+    print('Pred. Res.: {}'.format(predictive_residuals))
+    predictive_residual_sum_of_squares = numpy.sum(predictive_residuals**2, axis=1)
+    print('PRESS: {}'.format(predictive_residual_sum_of_squares))
+    predictive_r_squared = \
+        1 - predictive_residual_sum_of_squares/total_sum_of_squares
+
+    return (transform, predictive_r_squared)
+
+def LTCS_to_DSCS(transform, spherical_LTCS_coordinates):
+    cartesian_LTCS_coordinates = spherical_to_cartesian(spherical_LTCS_coordinates)
+    constant_vector = numpy.ones(numpy.shape(cartesian_LTCS_coordinates)[0])
+    X = numpy.vstack([constant_vector, cartesian_LTCS_coordinates.transpose()])
+    Y = numpy.dot(transform, X)
+    return(cartesian_to_cylindrical(Y[1:].transpose()))
+
+def DSCS_to_LTCS(transform, cylindrical_LTCS_coordinates):
+    cartesian_DSCS_coordinates = cylindrical_to_cartesian(cylindrical_LTCS_coordinates)
+    constant_vector = numpy.ones(numpy.shape(cartesian_DSCS_coordinates)[0])
+    Y = numpy.vstack([constant_vector, cartesian_DSCS_coordinates.transpose()])
+    X = numpy.dot(linalg.inv(transform), Y)
+    return(cartesian_to_spherical(X[1:].transpose()))
+
 # Measured Spherical LTCS Coordinates
-filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\reference_network_LTCS.csv'
+#filename = 'reference_network_LTCS.csv'
+#filename = 'reference_network_LTCS_20180504.csv'
+#filename = 'reference_network_LTCS_TEST.csv'
+filename = 'reference_network_IB2_LTCS.csv'
 with open(filename, 'r') as file:
     string_data = list(csv.reader(file, delimiter=','))
 
-data = numpy.ndarray((len(string_data), 3))
+data_LTCS = numpy.ndarray((len(string_data), 3))
 for index,row in enumerate(string_data):
     point = list(map(lambda x: float(x), row[1:]))
-    data[index,:] = point
+    data_LTCS[index,:] = point
 print('Measured Spherical LTCS Coordinates (azimuth, zenith, distance):\n{}'\
-      .format(data.transpose()))
+      .format(data_LTCS))
 
 # Measured Cartesian LTCS Coordinates
-P = numpy.ndarray((5, 3))
-for index,point in enumerate(data):
-    P[index,0] = point[2] * math.cos(point[0]) * math.sin(point[1])
-    P[index,1] = point[2] * math.sin(point[0]) * math.sin(point[1])
-    P[index,2] = point[2] * math.cos(point[1])
+P = spherical_to_cartesian(data_LTCS)
 print('Measured Cartesian LTCS Coordinates (x, y, z (up)):\n{}'.format(P.transpose()))
 mean_height = numpy.mean(P[:,2])
 # relative_heights = mean_height-P[:,2]
@@ -46,22 +136,18 @@ print('Measured Relative (B2) Distances: {}'.format(relative_distances))
 print()
 
 # Configured Cylindrical DSCS Coordinates
-filename = 'C:\\Users\\fms-local\\Desktop\\FMS\\reference_network.csv'
+filename = 'reference_network_IB2.csv'
 with open(filename, 'r') as file:
     string_data = list(csv.reader(file, delimiter=','))
 
-data = numpy.ndarray((len(string_data), 3))
+data_DSCS = numpy.ndarray((len(string_data), 3))
 for index,row in enumerate(string_data):
     point = list(map(lambda x: float(x), row[1:]))
-    data[index,:] = point
-print('Configured Cylindrical DSCS Coordinates (rho, theta, z):\n{}'.format(data))
+    data_DSCS[index,:] = point
+print('Configured Cylindrical DSCS Coordinates (rho, theta, z):\n{}'.format(data_DSCS))
 
 # Configured Cartesian DSCS Coordinates
-Pp = numpy.ndarray((5, 3))
-for index,point in enumerate(data):
-    Pp[index,0] = point[0] * math.cos(point[1])
-    Pp[index,1] = point[0] * math.sin(point[1])
-    Pp[index,2] = point[2]
+Pp = cylindrical_to_cartesian(data_DSCS)
 X_all = Pp.transpose()
 print('Configured Cartesian DSCS Coordinates: (x, y (up), z)\n{}'.format(X_all))
 mean_height = numpy.mean(Pp[:,1])
@@ -88,3 +174,14 @@ radii_residuals = radiip-radii
 print('Radii Residuals: {}'.format(radii_residuals))
 print('Radii Residuals Mean: {}'.format(numpy.mean(radii_residuals)))
 print('Radii Residuals Std. Dev.: {}'.format(numpy.std(radii_residuals)))
+
+transform,r_squared = calculate_transform(data_LTCS, data_DSCS)
+print('R^2 of LTCS->DSCS Transform: {}'.format(r_squared))
+
+cartesian_data_DSCS = cylindrical_to_cartesian(data_DSCS)
+transformed_DSCS = LTCS_to_DSCS(transform, data_LTCS)
+cartesian_transformed_DSCS = cylindrical_to_cartesian(transformed_DSCS)
+print(cartesian_data_DSCS)
+print(cartesian_transformed_DSCS)
+cartesian_residuals_DSCS = cartesian_data_DSCS - cartesian_transformed_DSCS
+print('Cartesian DSCS Residuals: {}'.format(cartesian_residuals_DSCS))
